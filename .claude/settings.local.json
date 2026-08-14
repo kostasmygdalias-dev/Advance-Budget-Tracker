@@ -102,7 +102,14 @@
       "Bash(curl -sI \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\")",
       "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\" -o /tmp/live_index.html)",
       "Bash(curl -sI \"https://custom.devcoresolutions.gr/assets/index-CQaVB7lN.js\")",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/deploy.yml'\\)\\)\")",
+      "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs?per_page=5\")",
+      "Bash(git commit --allow-empty -m ' *)",
+      "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs?per_page=3\")",
+      "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs?per_page=1\")",
+      "Bash(npx wrangler *)",
+      "Bash(node /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/check2.mjs /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/final6.png)"
     ],
     "additionalDirectories": [
       "\\tmp"

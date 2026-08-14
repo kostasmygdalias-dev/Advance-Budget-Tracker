@@ -13,6 +13,8 @@ import { addDays, addMonths, addWeeks, format } from 'date-fns';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import UpgradePrompt from '@/components/UpgradePrompt';
+import { useSubscription } from '@/hooks/use-subscription';
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
@@ -43,6 +45,7 @@ function advanceDate(dateStr, frequency, customDays) {
 
 export default function Recurring() {
   const { toast } = useToast();
+  const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
   const [templates, setTemplates] = useState([]);
   const [defaultCurrency, setDefaultCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
@@ -145,8 +148,9 @@ export default function Recurring() {
     }
   };
 
-  if (loading) return <PageSkeleton />;
+  if (loading || subLoading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
 
   return (
     <div className="space-y-6">

@@ -7,20 +7,34 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, CheckCircle2 } from 'lucide-react';
+import { Save, Download, CheckCircle2, Crown } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useSubscription } from '@/hooks/use-subscription';
+import { openBillingPortal } from '@/lib/subscription';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const manageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      await openBillingPortal();
+    } catch (err) {
+      toast({ title: 'Could not open billing portal', description: err.message, variant: 'destructive' });
+      setPortalLoading(false);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -110,6 +124,29 @@ export default function Settings() {
           Nobody else, including this app, keeps a separate copy.
         </p>
       </Card>
+
+      {billingConfigured && !subLoading && (
+        <Card className="p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${subActive ? 'bg-primary' : 'bg-muted'}`}>
+              <Crown className={`w-5 h-5 ${subActive ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{subActive ? 'Pro plan' : 'Free plan'}</p>
+              <p className="text-xs text-muted-foreground">
+                {subActive ? 'Recurring templates unlocked' : 'Upgrade to unlock recurring expense & income templates'}
+              </p>
+            </div>
+          </div>
+          {subActive ? (
+            <Button variant="outline" onClick={manageSubscription} disabled={portalLoading}>
+              {portalLoading ? 'Opening…' : 'Manage subscription'}
+            </Button>
+          ) : (
+            upgradeUrl && <Button onClick={() => { window.location.href = upgradeUrl; }}>Upgrade to Pro</Button>
+          )}
+        </Card>
+      )}
 
       <Card className="p-5 space-y-4">
         <p className="text-sm font-medium">Preferences</p>

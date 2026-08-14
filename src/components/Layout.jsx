@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, TrendingUp, FolderTree, Repeat, Settings as SettingsIcon, Wallet, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -16,6 +17,8 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { active: subActive, configured: billingConfigured } = useSubscription();
+  const showProBadge = billingConfigured && !subActive;
 
   const handleLogout = async () => {
     await logout();
@@ -47,6 +50,11 @@ export default function Layout() {
                 )}
               >
                 <Icon className="w-4 h-4" /> {item.label}
+                {item.to === '/recurring' && showProBadge && (
+                  <span className="ml-auto text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                    PRO
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -85,11 +93,15 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               className={cn(
-                'flex-1 flex flex-col items-center gap-1 py-2 text-[11px]',
+                'relative flex-1 flex flex-col items-center gap-1 py-2 text-[11px]',
                 isActive(item) ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <Icon className="w-5 h-5" /> {item.label}
+              <Icon className="w-5 h-5" />
+              {item.label}
+              {item.to === '/recurring' && showProBadge && (
+                <span className="absolute top-1 right-1/2 -mr-4 w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
             </Link>
           );
         })}

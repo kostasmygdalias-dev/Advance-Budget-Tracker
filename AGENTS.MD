@@ -2,11 +2,21 @@
 
 ## Project Context
 
-ExpenseTrack is a fully static React (Vite) app. There is no backend and no
-shared database: auth is "Sign in with Google," and every user's data
-(expenses, categories, recurring templates, settings) lives in a
-spreadsheet in that user's own Google Drive, read/written directly from the
-browser via the Sheets/Drive APIs.
+ExpenseTrack is a React (Vite) app, static except for one narrow exception:
+auth is "Sign in with Google," and every user's actual data (expenses,
+categories, recurring templates, settings) lives in a spreadsheet in that
+user's own Google Drive, read/written directly from the browser via the
+Sheets/Drive APIs — no database for app data, ever.
+
+The one exception is billing: Recurring templates are a paid feature, and
+`worker/` is a small Cloudflare Worker whose only job is answering "is this
+Google account currently subscribed" — enforced server-side so it can't be
+bypassed by editing the browser. It never sees expense/income data, only a
+Google account id and Stripe subscription status. See `BILLING_SETUP.md`
+for how it's wired up. Don't grow this into a general backend — if a new
+feature seems to need server-side logic beyond "is this account paying,"
+that's a signal to reconsider the approach, not to bolt more onto the
+Worker.
 
 This project previously ran on the Base44 platform; that dependency has
 been fully removed (no `@base44/sdk`, no Base44-hosted auth or database).
@@ -22,8 +32,10 @@ Do not reintroduce Base44-specific patterns.
   Drive upload for receipts. This is the equivalent of what would normally
   be a database layer.
 - `src/lib/finance.js`: pure calculation helpers (amortization schedules, monthly rollups).
+- `src/lib/subscription.js` / `src/hooks/use-subscription.js`: client for the billing Worker — fails open (full access) when billing env vars aren't set, so this stays inert until `BILLING_SETUP.md` is followed.
+- `worker/`: the Cloudflare Worker backing billing (see Project Context above). Separate `package.json`/deploy from the main app.
 - `vite.config.js`: Vite config, including the `@` → `src/` alias.
-- `.env` / `.env.example`: `VITE_GOOGLE_CLIENT_ID` — see `DEPLOY.md`.
+- `.env` / `.env.example`: `VITE_GOOGLE_CLIENT_ID` — see `DEPLOY.md`. `VITE_SUBSCRIPTION_API_URL` / `VITE_STRIPE_PAYMENT_LINK` — see `BILLING_SETUP.md`, both optional.
 
 ## Working Notes
 

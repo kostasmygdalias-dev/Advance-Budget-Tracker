@@ -24,6 +24,8 @@ jobs:
         run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_SUBSCRIPTION_API_URL: ${{ secrets.VITE_SUBSCRIPTION_API_URL }}
+          VITE_STRIPE_PAYMENT_LINK: ${{ secrets.VITE_STRIPE_PAYMENT_LINK }}
 
       - name: Deploy dist/ over FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
