@@ -61,8 +61,8 @@ export default function Recurring() {
     }).catch(() => {});
   }, []);
 
-  const openNew = () => setEditing({
-    type: 'expense', description: '', amount: '', currency: defaultCurrency, frequency: 'monthly', custom_interval_days: '',
+  const openNew = (type = 'expense') => setEditing({
+    type, description: '', amount: '', currency: defaultCurrency, frequency: 'monthly', custom_interval_days: '',
     next_due_date: format(new Date(), 'yyyy-MM-dd'), active: true, source: 'salary',
   });
   const openEdit = (t) => setEditing({
@@ -149,12 +149,15 @@ export default function Recurring() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Recurring</h1>
           <p className="text-sm text-muted-foreground">Templates for expenses and income that repeat indefinitely.</p>
         </div>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => openNew('income')}><Plus className="w-4 h-4 mr-1" /> New income</Button>
+          <Button onClick={() => openNew('expense')}><Plus className="w-4 h-4 mr-1" /> New expense</Button>
+        </div>
       </div>
 
       {templates.length === 0 && (
