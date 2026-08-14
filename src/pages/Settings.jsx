@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Save, Download, CheckCircle2 } from 'lucide-react';
 import LoadError from '@/components/LoadError';
+import PageSkeleton from '@/components/PageSkeleton';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
@@ -92,7 +93,7 @@ export default function Settings() {
   };
 
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
-  if (loading || !settings) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading || !settings) return <PageSkeleton rows={2} />;
 
   return (
     <div className="space-y-6">

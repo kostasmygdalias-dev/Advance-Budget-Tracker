@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
+import PageSkeleton from '@/components/PageSkeleton';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const ICONS = ['ShoppingCart', 'Car', 'Home', 'Utensils', 'Plane', 'Heart', 'GraduationCap', 'Briefcase', 'Gift', 'Zap'];
@@ -79,7 +80,7 @@ export default function Categories() {
     );
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (

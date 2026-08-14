@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import ExpenseForm from '@/components/ExpenseForm';
 import { entities } from '@/lib/sheetsStore';
 import LoadError from '@/components/LoadError';
+import PageSkeleton from '@/components/PageSkeleton';
 
 export default function AddEditExpense() {
   const { id } = useParams();
@@ -25,7 +26,7 @@ export default function AddEditExpense() {
 
   useEffect(load, [id]);
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <PageSkeleton rows={2} />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (

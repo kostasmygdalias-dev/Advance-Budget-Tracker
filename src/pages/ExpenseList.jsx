@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react';
 import { monthLabel } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
+import PageSkeleton from '@/components/PageSkeleton';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -73,7 +74,7 @@ export default function ExpenseList() {
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (

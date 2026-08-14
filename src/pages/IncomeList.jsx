@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Pencil } from 'lucide-react';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
+import PageSkeleton from '@/components/PageSkeleton';
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
@@ -40,7 +41,7 @@ export default function IncomeList() {
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
