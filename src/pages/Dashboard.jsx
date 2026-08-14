@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Plus, ChevronDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -19,6 +20,7 @@ const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -110,14 +112,15 @@ export default function Dashboard() {
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">{monthLabel(thisMonth)}</p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/income/new">
-            <Button variant="outline"><Plus className="w-4 h-4 mr-1" /> Add income</Button>
-          </Link>
-          <Link to="/expenses/new">
-            <Button><Plus className="w-4 h-4 mr-1" /> Add expense</Button>
-          </Link>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => navigate('/income/new')}>Income</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

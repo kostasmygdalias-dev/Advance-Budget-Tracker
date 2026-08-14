@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Pencil, Trash2, X, Zap, Pause } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Zap, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, format } from 'date-fns';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
@@ -154,10 +155,15 @@ export default function Recurring() {
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Recurring</h1>
           <p className="text-sm text-muted-foreground">Templates for expenses and income that repeat indefinitely.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => openNew('income')}><Plus className="w-4 h-4 mr-1" /> New income</Button>
-          <Button onClick={() => openNew('expense')}><Plus className="w-4 h-4 mr-1" /> New expense</Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button><Plus className="w-4 h-4 mr-1" /> New <ChevronDown className="w-4 h-4 ml-1" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => openNew('income')}>Income</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openNew('expense')}>Expense</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {templates.length === 0 && (
