@@ -1,0 +1,88 @@
+{
+  "name": "Expense",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "EUR"
+    },
+    "paid_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "category_id": {
+      "type": "string"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "card",
+        "bank_transfer",
+        "other"
+      ],
+      "default": "card"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "receipt_file_url": {
+      "type": "string"
+    },
+    "expense_type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "amortized"
+      ],
+      "default": "single"
+    },
+    "period_value": {
+      "type": "number"
+    },
+    "period_unit": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "year"
+      ]
+    },
+    "amortization_schedule": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "amount"
+        ]
+      }
+    }
+  },
+  "required": [
+    "description",
+    "amount",
+    "paid_date"
+  ]
+}

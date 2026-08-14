@@ -1,0 +1,43 @@
+{
+  "name": "RecurringTemplate",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "EUR"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "custom_days"
+      ],
+      "default": "monthly"
+    },
+    "custom_interval_days": {
+      "type": "number"
+    },
+    "next_due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "description",
+    "amount",
+    "frequency",
+    "next_due_date"
+  ]
+}
