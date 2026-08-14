@@ -32,7 +32,7 @@ const SCHEMAS = {
   Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date'],
   Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
-  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date'],
+  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source'],
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date'],
 };
 
@@ -212,11 +212,16 @@ const Category = makeStore(
 
 const RecurringTemplate = makeStore(
   'RecurringTemplate',
-  (t) => [t.id, t.description || '', t.amount ?? 0, t.currency || 'EUR', t.frequency || 'monthly', t.custom_interval_days ?? '', t.next_due_date || '', t.active !== false, t.created_date || new Date().toISOString()],
-  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date]) => ({
+  (t) => [
+    t.id, t.description || '', t.amount ?? 0, t.currency || 'EUR', t.frequency || 'monthly', t.custom_interval_days ?? '',
+    t.next_due_date || '', t.active !== false, t.created_date || new Date().toISOString(), t.type || 'expense', t.source || '',
+  ],
+  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date, type, source]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', frequency: frequency || 'monthly',
     custom_interval_days: custom_interval_days !== '' && custom_interval_days != null ? Number(custom_interval_days) : null,
     next_due_date: next_due_date || '', active: active === true || active === 'TRUE', created_date: created_date || '',
+    // `type` is missing (empty string) on rows written before recurring income existed — those were all expense templates.
+    type: type || 'expense', source: source || null,
   }),
 );
 

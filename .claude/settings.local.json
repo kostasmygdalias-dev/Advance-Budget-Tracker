@@ -79,7 +79,15 @@
       "Bash(xargs -r kill)",
       "Bash(disown)",
       "Bash(timeout 30 bash -c 'until curl -sf http://localhost:5173 >/dev/null; do sleep 1; done')",
-      "Bash(rm -f __TRACKED_VAR__/node_modules)"
+      "Bash(rm -f __TRACKED_VAR__/node_modules)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Read(//Users/mygdalias/.ssh/**)",
+      "Bash(git credential-osxkeychain *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(git fetch *)",
+      "Bash(echo \"LINT EXIT: $?\")",
+      "Bash(echo \"BUILD EXIT: $?\")"
     ],
     "additionalDirectories": [
       "\\tmp"
