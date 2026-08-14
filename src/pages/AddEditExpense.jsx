@@ -4,21 +4,29 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import ExpenseForm from '@/components/ExpenseForm';
 import { entities } from '@/lib/sheetsStore';
+import LoadError from '@/components/LoadError';
 
 export default function AddEditExpense() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(!!id);
+  const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
     if (!id) return;
+    setLoading(true);
+    setLoadError(null);
     entities.Expense.get(id)
       .then((e) => setExpense(e))
+      .catch((err) => setLoadError(err))
       .finally(() => setLoading(false));
-  }, [id]);
+  };
+
+  useEffect(load, [id]);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
     <div className="space-y-6">

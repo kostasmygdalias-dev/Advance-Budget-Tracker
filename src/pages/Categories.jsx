@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import LoadError from '@/components/LoadError';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const ICONS = ['ShoppingCart', 'Car', 'Home', 'Utensils', 'Plane', 'Heart', 'GraduationCap', 'Briefcase', 'Gift', 'Zap'];
@@ -16,11 +17,13 @@ export default function Categories() {
   const { toast } = useToast();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null); // {id?, name, icon, color, parent_id}
 
   const load = () => {
     setLoading(true);
-    entities.Category.list().then(setCategories).finally(() => setLoading(false));
+    setLoadError(null);
+    entities.Category.list().then(setCategories).catch(setLoadError).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -77,6 +80,7 @@ export default function Categories() {
   };
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
     <div className="space-y-6">

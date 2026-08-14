@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Zap, Pause } from 'lucide-react';
 import { addDays, addMonths, addWeeks, format } from 'date-fns';
+import LoadError from '@/components/LoadError';
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
@@ -37,11 +38,13 @@ export default function Recurring() {
   const [templates, setTemplates] = useState([]);
   const [defaultCurrency, setDefaultCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null);
 
   const load = () => {
     setLoading(true);
-    entities.RecurringTemplate.list().then(setTemplates).finally(() => setLoading(false));
+    setLoadError(null);
+    entities.RecurringTemplate.list().then(setTemplates).catch(setLoadError).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -114,6 +117,7 @@ export default function Recurring() {
   };
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
     <div className="space-y-6">

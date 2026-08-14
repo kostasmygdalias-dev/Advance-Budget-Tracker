@@ -11,6 +11,7 @@ import {
 import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel,
 } from '@/lib/finance';
+import LoadError from '@/components/LoadError';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
@@ -20,8 +21,11 @@ export default function Dashboard() {
   const [categories, setCategories] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
     (async () => {
       try {
         const [exp, cats, sets] = await Promise.all([
@@ -32,13 +36,18 @@ export default function Dashboard() {
         setExpenses(exp);
         setCategories(cats);
         setSettings(sets[0] || null);
+      } catch (err) {
+        setLoadError(err);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  };
+
+  useEffect(load, []);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   const catMap = {};
   categories.forEach((c) => { catMap[c.id] = c; });

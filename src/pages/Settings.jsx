@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { Save, Download, CheckCircle2 } from 'lucide-react';
+import LoadError from '@/components/LoadError';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
@@ -17,9 +18,12 @@ export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
     (async () => {
       try {
         const [sets, cats] = await Promise.all([
@@ -38,11 +42,15 @@ export default function Settings() {
           setSettings(created);
         }
         setCategories(cats);
+      } catch (err) {
+        setLoadError(err);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  };
+
+  useEffect(load, []);
 
   const update = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
   const updateBudget = (catId, v) =>
@@ -82,6 +90,7 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (loading || !settings) return <p className="text-muted-foreground">Loading…</p>;
 
   return (

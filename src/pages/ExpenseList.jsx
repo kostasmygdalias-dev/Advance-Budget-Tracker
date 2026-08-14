@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react';
 import { monthLabel } from '@/lib/finance';
+import LoadError from '@/components/LoadError';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -22,6 +23,7 @@ export default function ExpenseList() {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [filters, setFilters] = useState({
     search: '',
@@ -31,7 +33,9 @@ export default function ExpenseList() {
     to: '',
   });
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
     (async () => {
       try {
         const [exp, cats] = await Promise.all([
@@ -40,11 +44,15 @@ export default function ExpenseList() {
         ]);
         setExpenses(exp);
         setCategories(cats);
+      } catch (err) {
+        setLoadError(err);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  };
+
+  useEffect(load, []);
 
   const catMap = useMemo(() => {
     const m = {};
@@ -66,6 +74,7 @@ export default function ExpenseList() {
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
     <div className="space-y-6">

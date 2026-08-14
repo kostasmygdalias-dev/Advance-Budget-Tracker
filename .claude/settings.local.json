@@ -11,7 +11,16 @@
       "Bash(git -c user.email=\"kostas_mygdalias@hotmail.com\" -c user.name=\"Kostas\" commit -q -m \"Checkpoint: Base44 app before migrating off Base44 \\(auth + Google Sheets storage\\)\")",
       "Bash(cd \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\" && git show HEAD:base44/shared/finance.js > /tmp/finance_recovered.js 2>&1 && cat /tmp/finance_recovered.js | head -5 && echo \"--- OK, recovered ---\")",
       "Read(//tmp/**)",
-      "Bash(mkdir -p \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\" && cp /tmp/finance_recovered.js \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\\\\finance.js\" && cat \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\\\\finance.js\")"
+      "Bash(mkdir -p \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\" && cp /tmp/finance_recovered.js \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\\\\finance.js\" && cat \"c:\\\\Users\\\\Kostas\\\\BACKEND_KOSTAS\\\\src\\\\lib\\\\finance.js\")",
+      "Bash(git -c user.email=kostas_mygdalias@hotmail.com -c user.name=Kostas commit -q -m ' *)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/src/main.jsx)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 5208 //F)",
+      "Bash(gh auth *)",
+      "Bash(gh --version)",
+      "Bash(git config *)"
     ],
     "additionalDirectories": [
       "\\tmp"
