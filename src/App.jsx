@@ -10,6 +10,8 @@ import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import ExpenseList from '@/pages/ExpenseList';
 import AddEditExpense from '@/pages/AddEditExpense';
+import IncomeList from '@/pages/IncomeList';
+import AddEditIncome from '@/pages/AddEditIncome';
 import Categories from '@/pages/Categories';
 import Recurring from '@/pages/Recurring';
 import SettingsPage from '@/pages/Settings';
@@ -35,6 +37,9 @@ const AuthenticatedApp = () => {
           <Route path="/expenses" element={<ExpenseList />} />
           <Route path="/expenses/new" element={<AddEditExpense />} />
           <Route path="/expenses/:id/edit" element={<AddEditExpense />} />
+          <Route path="/income" element={<IncomeList />} />
+          <Route path="/income/new" element={<AddEditIncome />} />
+          <Route path="/income/:id/edit" element={<AddEditIncome />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/recurring" element={<Recurring />} />
           <Route path="/settings" element={<SettingsPage />} />

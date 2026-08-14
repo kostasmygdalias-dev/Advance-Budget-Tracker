@@ -30,6 +30,7 @@ const driveFetch = (path, init) => authedFetch(`https://www.googleapis.com/drive
 
 const SCHEMAS = {
   Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date'],
+  Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
   RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date'],
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date'],
@@ -61,9 +62,41 @@ async function createSpreadsheet() {
   return created.spreadsheetId;
 }
 
+// Adds any sheet tab (e.g. a newly introduced collection) that's missing from
+// a spreadsheet created by an older version of the app, so existing users
+// self-heal to the current schema instead of hitting a "range not found" error.
+async function ensureAllSheetsExist(spreadsheetId) {
+  const meta = await sheetsFetch(`/${spreadsheetId}?fields=sheets.properties`);
+  const existingTitles = new Set();
+  meta.sheets.forEach((s) => {
+    existingTitles.add(s.properties.title);
+    sheetGidCache.set(`${spreadsheetId}:${s.properties.title}`, s.properties.sheetId);
+  });
+  const missing = Object.keys(SCHEMAS).filter((title) => !existingTitles.has(title));
+  if (!missing.length) return;
+  const created = await sheetsFetch(`/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ requests: missing.map((title) => ({ addSheet: { properties: { title } } })) }),
+  });
+  created.replies.forEach((r) => sheetGidCache.set(`${spreadsheetId}:${r.addSheet.properties.title}`, r.addSheet.properties.sheetId));
+  await Promise.all(missing.map((title) =>
+    sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(title)}!A1:append?valueInputOption=RAW`, {
+      method: 'POST',
+      body: JSON.stringify({ values: [SCHEMAS[title]] }),
+    }),
+  ));
+}
+
 function getSpreadsheetId() {
   if (!spreadsheetIdPromise) {
-    spreadsheetIdPromise = (async () => (await findSpreadsheetId()) || createSpreadsheet())();
+    spreadsheetIdPromise = (async () => {
+      const existing = await findSpreadsheetId();
+      if (existing) {
+        await ensureAllSheetsExist(existing);
+        return existing;
+      }
+      return createSpreadsheet();
+    })();
   }
   return spreadsheetIdPromise;
 }
@@ -197,7 +230,19 @@ const Settings = makeStore(
   }),
 );
 
-export const entities = { Expense, Category, RecurringTemplate, Settings };
+const Income = makeStore(
+  'Incomes',
+  (i) => [
+    i.id, i.description || '', i.amount ?? 0, i.currency || 'EUR', i.received_date || '',
+    i.source || 'other', i.notes || '', JSON.stringify(i.tags || []), i.created_date || new Date().toISOString(),
+  ],
+  ([id, description, amount, currency, received_date, source, notes, tags, created_date]) => ({
+    id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', received_date: received_date || '',
+    source: source || 'other', notes: notes || null, tags: tags ? JSON.parse(tags) : [], created_date: created_date || '',
+  }),
+);
+
+export const entities = { Expense, Income, Category, RecurringTemplate, Settings };
 
 // Multipart upload to the user's Drive (drive.file scope: the app can only
 // see files it creates, not the rest of their Drive).

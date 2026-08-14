@@ -1,10 +1,11 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, FolderTree, Repeat, Settings as SettingsIcon, Wallet, LogOut } from 'lucide-react';
+import { LayoutDashboard, Receipt, TrendingUp, FolderTree, Repeat, Settings as SettingsIcon, Wallet, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/income', label: 'Income', icon: TrendingUp },
   { to: '/expenses', label: 'Expenses', icon: Receipt },
   { to: '/categories', label: 'Categories', icon: FolderTree },
   { to: '/recurring', label: 'Recurring', icon: Repeat },

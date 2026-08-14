@@ -79,6 +79,10 @@ export function getMonthlyContribution(expense, monthStr) {
   return expense.paid_date.slice(0, 7) === monthStr ? expense.amount || 0 : 0;
 }
 
+export function isInMonth(dateStr, monthStr) {
+  return !!dateStr && dateStr.slice(0, 7) === monthStr;
+}
+
 export function getRecentMonths(n, ref = new Date()) {
   const base = startOfMonth(ref);
   const months = [];

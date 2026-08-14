@@ -76,12 +76,13 @@ export default function Settings() {
   };
 
   const exportData = async () => {
-    const [exp, cats, templates] = await Promise.all([
+    const [exp, inc, cats, templates] = await Promise.all([
       entities.Expense.list('-paid_date', 2000),
+      entities.Income.list('-received_date', 2000),
       entities.Category.list(),
       entities.RecurringTemplate.list(),
     ]);
-    const blob = new Blob([JSON.stringify({ expenses: exp, categories: cats, recurring_templates: templates, settings }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ expenses: exp, incomes: inc, categories: cats, recurring_templates: templates, settings }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

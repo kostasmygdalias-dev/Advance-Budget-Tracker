@@ -18,9 +18,9 @@ Do not reintroduce Base44-specific patterns.
 - `src/lib/googleAuth.js`: Google Identity Services wrapper (sign-in, token management).
 - `src/lib/AuthContext.jsx`: React auth state, built on `googleAuth.js`.
 - `src/lib/sheetsStore.js`: the data layer — CRUD against the user's Google
-  Sheet for Expenses/Categories/RecurringTemplate/Settings, plus Drive
-  upload for receipts. This is the equivalent of what would normally be a
-  database layer.
+  Sheet for Expenses/Incomes/Categories/RecurringTemplate/Settings, plus
+  Drive upload for receipts. This is the equivalent of what would normally
+  be a database layer.
 - `src/lib/finance.js`: pure calculation helpers (amortization schedules, monthly rollups).
 - `vite.config.js`: Vite config, including the `@` → `src/` alias.
 - `.env` / `.env.example`: `VITE_GOOGLE_CLIENT_ID` — see `DEPLOY.md`.
