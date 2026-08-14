@@ -87,7 +87,22 @@
       "Bash(echo \"exit:$?\")",
       "Bash(git fetch *)",
       "Bash(echo \"LINT EXIT: $?\")",
-      "Bash(echo \"BUILD EXIT: $?\")"
+      "Bash(echo \"BUILD EXIT: $?\")",
+      "Bash(echo \"LINT: $?\")",
+      "Bash(echo \"BUILD: $?\")",
+      "Bash(curl -sf http://localhost:5173)",
+      "Bash(break)",
+      "Bash(ln -sfn /Users/mygdalias/.npm/_npx/e41f203b7505f1fb/node_modules /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/node_modules)",
+      "Bash(node /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/check2.mjs /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/final4.png)",
+      "Bash(rm -f /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/node_modules)",
+      "Bash(curl -s https://custom.devcoresolutions.gr/)",
+      "Bash(curl -sI https://custom.devcoresolutions.gr/)",
+      "Bash(curl -sI https://custom.devcoresolutions.gr/assets/index-CPPz69ic.js)",
+      "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\")",
+      "Bash(curl -sI \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\" -o /tmp/live_index.html)",
+      "Bash(curl -sI \"https://custom.devcoresolutions.gr/assets/index-CQaVB7lN.js\")",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
       "\\tmp"
