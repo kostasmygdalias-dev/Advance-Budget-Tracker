@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,8 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { calculateAmortizationSchedule } from '../../base44/shared/finance';
-import { expenseSheet } from '@/lib/expenseSheet';
+import { calculateAmortizationSchedule } from '@/lib/finance';
+import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import AmortizationPreview from './AmortizationPreview';
 
 const PAYMENT_METHODS = [
@@ -53,7 +52,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   });
 
   useEffect(() => {
-    base44.entities.Category.list().then(setCategories).catch(() => {});
+    entities.Category.list().then(setCategories).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -92,8 +91,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
     try {
       let receipt_url = initialExpense?.receipt_file_url || '';
       if (receiptFile) {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file: receiptFile });
-        receipt_url = file_url;
+        receipt_url = await uploadReceipt(receiptFile);
       }
       const tags = form.tags.split(',').map((t) => t.trim()).filter(Boolean);
       const payload = {
@@ -114,9 +112,9 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           : [],
       };
       if (initialExpense?.id) {
-        await expenseSheet.update(initialExpense.id, payload);
+        await entities.Expense.update(initialExpense.id, payload);
       } else {
-        await expenseSheet.create(payload);
+        await entities.Expense.create(payload);
       }
       toast({ title: initialExpense ? 'Expense updated' : 'Expense added' });
       onSaved?.();

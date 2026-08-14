@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Zap, Pause } from 'lucide-react';
 import { addDays, addMonths, addWeeks, format } from 'date-fns';
-import { expenseSheet, NotConnectedError } from '@/lib/expenseSheet';
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
@@ -42,12 +41,12 @@ export default function Recurring() {
 
   const load = () => {
     setLoading(true);
-    base44.entities.RecurringTemplate.list().then(setTemplates).finally(() => setLoading(false));
+    entities.RecurringTemplate.list().then(setTemplates).finally(() => setLoading(false));
   };
 
   useEffect(() => {
     load();
-    base44.entities.Settings.list().then((sets) => {
+    entities.Settings.list().then((sets) => {
       if (sets[0]?.default_currency) setDefaultCurrency(sets[0].default_currency);
     }).catch(() => {});
   }, []);
@@ -72,9 +71,9 @@ export default function Recurring() {
     };
     try {
       if (editing.id) {
-        await base44.entities.RecurringTemplate.update(editing.id, payload);
+        await entities.RecurringTemplate.update(editing.id, payload);
       } else {
-        await base44.entities.RecurringTemplate.create(payload);
+        await entities.RecurringTemplate.create(payload);
       }
       setEditing(null);
       load();
@@ -84,18 +83,18 @@ export default function Recurring() {
   };
 
   const toggleActive = async (t) => {
-    await base44.entities.RecurringTemplate.update(t.id, { active: !t.active });
+    await entities.RecurringTemplate.update(t.id, { active: !t.active });
     load();
   };
 
   const remove = async (t) => {
-    await base44.entities.RecurringTemplate.delete(t.id);
+    await entities.RecurringTemplate.delete(t.id);
     load();
   };
 
   const generateNext = async (t) => {
     try {
-      await expenseSheet.create({
+      await entities.Expense.create({
         description: t.description,
         amount: t.amount,
         currency: t.currency || defaultCurrency,
@@ -106,15 +105,11 @@ export default function Recurring() {
         tags: ['recurring'],
       });
       const next = advanceDate(t.next_due_date, t.frequency, t.custom_interval_days);
-      await base44.entities.RecurringTemplate.update(t.id, { next_due_date: format(next, 'yyyy-MM-dd') });
+      await entities.RecurringTemplate.update(t.id, { next_due_date: format(next, 'yyyy-MM-dd') });
       toast({ title: 'Entry generated', description: `Next due: ${format(next, 'yyyy-MM-dd')}` });
       load();
     } catch (err) {
-      if (err instanceof NotConnectedError) {
-        toast({ title: 'Connect Google Sheets first', description: 'Go to Settings to connect your Google account.', variant: 'destructive' });
-      } else {
-        toast({ title: 'Could not generate', description: err.message, variant: 'destructive' });
-      }
+      toast({ title: 'Could not generate', description: err.message, variant: 'destructive' });
     }
   };
 

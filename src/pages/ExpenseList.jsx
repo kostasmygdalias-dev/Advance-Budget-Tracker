@@ -1,15 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react';
-import { monthLabel } from '../../base44/shared/finance';
-import { expenseSheet, NotConnectedError } from '@/lib/expenseSheet';
-import GoogleSheetsNotConnected from '@/components/GoogleSheetsNotConnected';
+import { monthLabel } from '@/lib/finance';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -24,7 +22,6 @@ export default function ExpenseList() {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [notConnected, setNotConnected] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [filters, setFilters] = useState({
     search: '',
@@ -37,11 +34,12 @@ export default function ExpenseList() {
   useEffect(() => {
     (async () => {
       try {
-        setCategories(await base44.entities.Category.list());
-        setExpenses(await expenseSheet.list('-paid_date', 500));
-      } catch (err) {
-        if (err instanceof NotConnectedError) setNotConnected(true);
-        else throw err;
+        const [exp, cats] = await Promise.all([
+          entities.Expense.list('-paid_date', 500),
+          entities.Category.list(),
+        ]);
+        setExpenses(exp);
+        setCategories(cats);
       } finally {
         setLoading(false);
       }
@@ -68,7 +66,6 @@ export default function ExpenseList() {
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (notConnected) return <GoogleSheetsNotConnected />;
 
   return (
     <div className="space-y-6">

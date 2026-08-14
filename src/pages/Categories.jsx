@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ export default function Categories() {
 
   const load = () => {
     setLoading(true);
-    base44.entities.Category.list().then(setCategories).finally(() => setLoading(false));
+    entities.Category.list().then(setCategories).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -42,9 +42,9 @@ export default function Categories() {
     };
     try {
       if (editing.id) {
-        await base44.entities.Category.update(editing.id, payload);
+        await entities.Category.update(editing.id, payload);
       } else {
-        await base44.entities.Category.create(payload);
+        await entities.Category.create(payload);
       }
       setEditing(null);
       load();
@@ -54,7 +54,7 @@ export default function Categories() {
   };
 
   const remove = async (c) => {
-    await base44.entities.Category.delete(c.id);
+    await entities.Category.delete(c.id);
     load();
   };
 
@@ -72,7 +72,7 @@ export default function Categories() {
       return [...reordered.map((c, i) => ({ ...c, sort_order: i })), ...others];
     });
     await Promise.all(
-      reordered.map((c, i) => (c.sort_order === i ? null : base44.entities.Category.update(c.id, { sort_order: i })))
+      reordered.map((c, i) => (c.sort_order === i ? null : entities.Category.update(c.id, { sort_order: i })))
     );
   };
 

@@ -1,0 +1,13 @@
+# This is a client-side-routed single-page app (React Router). Without this,
+# refreshing on any route other than "/" (e.g. /expenses) returns a 404 from
+# the host, because there's no actual file at that path — only index.html
+# knows how to render it. This rewrites every request that isn't a real file
+# back to index.html so React Router can take over.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

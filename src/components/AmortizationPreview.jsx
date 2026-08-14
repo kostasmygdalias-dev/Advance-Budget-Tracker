@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { calculateAmortizationSchedule, averageMonthlyCost, monthLabel } from '../../base44/shared/finance';
+import { calculateAmortizationSchedule, averageMonthlyCost, monthLabel } from '@/lib/finance';
 
 export default function AmortizationPreview({ amount, periodValue, periodUnit, paidDate, currency = 'EUR' }) {
   const schedule = useMemo(

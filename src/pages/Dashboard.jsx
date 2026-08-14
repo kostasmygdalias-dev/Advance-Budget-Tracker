@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
-import { expenseSheet } from '@/lib/expenseSheet';
+import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
@@ -11,9 +10,7 @@ import {
 } from 'recharts';
 import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel,
-} from '../../base44/shared/finance';
-import { NotConnectedError } from '@/lib/expenseSheet';
-import GoogleSheetsNotConnected from '@/components/GoogleSheetsNotConnected';
+} from '@/lib/finance';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
@@ -23,21 +20,18 @@ export default function Dashboard() {
   const [categories, setCategories] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [notConnected, setNotConnected] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [cats, sets] = await Promise.all([
-          base44.entities.Category.list(),
-          base44.entities.Settings.list(),
+        const [exp, cats, sets] = await Promise.all([
+          entities.Expense.list('-paid_date', 500),
+          entities.Category.list(),
+          entities.Settings.list(),
         ]);
+        setExpenses(exp);
         setCategories(cats);
         setSettings(sets[0] || null);
-        setExpenses(await expenseSheet.list('-paid_date', 500));
-      } catch (err) {
-        if (err instanceof NotConnectedError) setNotConnected(true);
-        else throw err;
       } finally {
         setLoading(false);
       }
@@ -45,7 +39,6 @@ export default function Dashboard() {
   }, []);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (notConnected) return <GoogleSheetsNotConnected />;
 
   const catMap = {};
   categories.forEach((c) => { catMap[c.id] = c; });

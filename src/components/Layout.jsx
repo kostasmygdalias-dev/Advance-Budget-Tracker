@@ -1,6 +1,6 @@
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, FolderTree, Repeat, Settings as SettingsIcon, Wallet, LogOut } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -13,9 +13,12 @@ const NAV = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
-    await base44.auth.logout();
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   const isActive = (item) =>

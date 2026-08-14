@@ -3,29 +3,22 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import ExpenseForm from '@/components/ExpenseForm';
-import { expenseSheet, NotConnectedError } from '@/lib/expenseSheet';
-import GoogleSheetsNotConnected from '@/components/GoogleSheetsNotConnected';
+import { entities } from '@/lib/sheetsStore';
 
 export default function AddEditExpense() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(!!id);
-  const [notConnected, setNotConnected] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    expenseSheet.get(id)
+    entities.Expense.get(id)
       .then((e) => setExpense(e))
-      .catch((err) => {
-        if (err instanceof NotConnectedError) setNotConnected(true);
-        else throw err;
-      })
       .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (notConnected) return <GoogleSheetsNotConnected />;
 
   return (
     <div className="space-y-6">

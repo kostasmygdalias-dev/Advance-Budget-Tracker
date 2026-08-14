@@ -1,38 +1,36 @@
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { expenseSheet, NotConnectedError } from '@/lib/expenseSheet';
-import { GOOGLE_SHEETS_CONNECTOR_ID } from '@/lib/googleConnector';
+import { entities } from '@/lib/sheetsStore';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, HardDrive, HardDriveUpload, CheckCircle2, Loader2 } from 'lucide-react';
+import { Save, Download, CheckCircle2 } from 'lucide-react';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sheetsConnected, setSheetsConnected] = useState(null); // null = checking
-  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const [sets, cats] = await Promise.all([
-          base44.entities.Settings.list(),
-          base44.entities.Category.list(),
+          entities.Settings.list(),
+          entities.Category.list(),
         ]);
         const existing = sets[0];
         if (existing) {
           setSettings(existing);
         } else {
-          const created = await base44.entities.Settings.create({
+          const created = await entities.Settings.create({
             default_currency: 'EUR',
             monthly_budget_total: null,
             budget_per_category: {},
@@ -44,34 +42,7 @@ export default function Settings() {
         setLoading(false);
       }
     })();
-    expenseSheet.list(null, 1)
-      .then(() => setSheetsConnected(true))
-      .catch((err) => setSheetsConnected(!(err instanceof NotConnectedError)));
   }, []);
-
-  const connectGoogleSheets = async () => {
-    setConnecting(true);
-    try {
-      const redirectUrl = await base44.connectors.connectAppUser(GOOGLE_SHEETS_CONNECTOR_ID);
-      window.location.href = redirectUrl;
-    } catch (err) {
-      toast({ title: 'Could not start Google connection', description: err.message, variant: 'destructive' });
-      setConnecting(false);
-    }
-  };
-
-  const disconnectGoogleSheets = async () => {
-    setConnecting(true);
-    try {
-      await base44.connectors.disconnectAppUser(GOOGLE_SHEETS_CONNECTOR_ID);
-      setSheetsConnected(false);
-      toast({ title: 'Google Sheets disconnected' });
-    } catch (err) {
-      toast({ title: 'Could not disconnect', description: err.message, variant: 'destructive' });
-    } finally {
-      setConnecting(false);
-    }
-  };
 
   const update = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
   const updateBudget = (catId, v) =>
@@ -83,7 +54,7 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
-      await base44.entities.Settings.update(settings.id, {
+      await entities.Settings.update(settings.id, {
         default_currency: settings.default_currency,
         monthly_budget_total: settings.monthly_budget_total || null,
         budget_per_category: settings.budget_per_category || {},
@@ -98,9 +69,9 @@ export default function Settings() {
 
   const exportData = async () => {
     const [exp, cats, templates] = await Promise.all([
-      expenseSheet.list('-paid_date', 2000).catch(() => []),
-      base44.entities.Category.list(),
-      base44.entities.RecurringTemplate.list(),
+      entities.Expense.list('-paid_date', 2000),
+      entities.Category.list(),
+      entities.RecurringTemplate.list(),
     ]);
     const blob = new Blob([JSON.stringify({ expenses: exp, categories: cats, recurring_templates: templates, settings }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -117,29 +88,16 @@ export default function Settings() {
     <div className="space-y-6">
       <h1 className="text-2xl font-heading font-semibold tracking-tight">Settings</h1>
 
-      <Card className="p-5 space-y-4">
-        <div className={`flex items-center gap-2 ${sheetsConnected ? 'text-emerald-600' : 'text-amber-600'}`}>
-          {sheetsConnected ? <CheckCircle2 className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
-          <p className="text-sm font-medium">Your expenses in Google Sheets</p>
+      <Card className="p-5 space-y-2">
+        <div className="flex items-center gap-2 text-emerald-600">
+          <CheckCircle2 className="w-5 h-5" />
+          <p className="text-sm font-medium">Signed in as {user?.email}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          {sheetsConnected
-            ? 'Your expenses are stored in a spreadsheet in your own Google Drive — nobody else, including this app\'s database, holds a copy.'
-            : 'Expenses are stored in a spreadsheet created in your own Google Drive, not in a shared database. Connect your Google account once to get started.'}
+          All your data — expenses, categories, recurring templates, and these settings —
+          lives in a spreadsheet named "ExpenseTrack Data" in your own Google Drive.
+          Nobody else, including this app, keeps a separate copy.
         </p>
-        {sheetsConnected === null ? (
-          <Button variant="outline" disabled>
-            <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Checking…
-          </Button>
-        ) : sheetsConnected ? (
-          <Button variant="outline" onClick={disconnectGoogleSheets} disabled={connecting}>
-            <HardDriveUpload className="w-4 h-4 mr-1" /> {connecting ? 'Disconnecting…' : 'Disconnect Google Sheets'}
-          </Button>
-        ) : (
-          <Button variant="outline" onClick={connectGoogleSheets} disabled={connecting}>
-            <HardDriveUpload className="w-4 h-4 mr-1" /> {connecting ? 'Redirecting…' : 'Connect Google Sheets'}
-          </Button>
-        )}
       </Card>
 
       <Card className="p-5 space-y-4">
