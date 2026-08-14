@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git remote*)",
+      "Bash(git fetch*)",
+      "Bash(git add *)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git stash*)",
+      "Bash(git config --get*)",
+      "Bash(git check-ignore*)",
+      "Bash(git credential-osxkeychain get*)",
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npm uninstall*)",
+      "Bash(npm ci*)",
+      "Bash(npm ls*)",
+      "Bash(npm audit*)",
+      "Bash(npm view*)",
+      "Bash(curl -s*)",
+      "Bash(curl -sI*)",
+      "Bash(curl -sf*)",
+      "Bash(curl -sv*)",
+      "Bash(lsof *)",
+      "Bash(ps *)",
+      "Bash(kill *)",
+      "Bash(node *)",
+      "Bash(npx --no-install playwright *)",
+      "Bash(mkdir -p *)",
+      "Bash(ln -sfn *)",
+      "Bash(rm -f *)"
+    ]
+  }
+}
