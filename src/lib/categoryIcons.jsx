@@ -1,5 +1,8 @@
 import {
   ShoppingCart, Car, Home, Utensils, Plane, Heart, GraduationCap, Briefcase, Gift, Zap,
+  Key, Droplet, Wifi, Wrench, Fuel, Bus, ParkingCircle, Shield, Carrot, Coffee, Package,
+  Smartphone, Tv, Laptop, Stethoscope, Pill, Smile, Dumbbell, Hotel, Shirt, Monitor,
+  Sparkles, Film, Gamepad2, Ticket, BookOpen, HandHeart, ShoppingBag, Clapperboard,
   HelpCircle,
 } from 'lucide-react';
 
@@ -8,10 +11,16 @@ import {
 // this maps those names back to the actual lucide component.
 export const CATEGORY_ICON_NAMES = [
   'ShoppingCart', 'Car', 'Home', 'Utensils', 'Plane', 'Heart', 'GraduationCap', 'Briefcase', 'Gift', 'Zap',
+  'Key', 'Droplet', 'Wifi', 'Wrench', 'Fuel', 'Bus', 'ParkingCircle', 'Shield', 'Carrot', 'Coffee', 'Package',
+  'Smartphone', 'Tv', 'Laptop', 'Stethoscope', 'Pill', 'Smile', 'Dumbbell', 'Hotel', 'Shirt', 'Monitor',
+  'Sparkles', 'Film', 'Gamepad2', 'Ticket', 'BookOpen', 'HandHeart', 'ShoppingBag', 'Clapperboard',
 ];
 
 const CATEGORY_ICON_MAP = {
   ShoppingCart, Car, Home, Utensils, Plane, Heart, GraduationCap, Briefcase, Gift, Zap,
+  Key, Droplet, Wifi, Wrench, Fuel, Bus, ParkingCircle, Shield, Carrot, Coffee, Package,
+  Smartphone, Tv, Laptop, Stethoscope, Pill, Smile, Dumbbell, Hotel, Shirt, Monitor,
+  Sparkles, Film, Gamepad2, Ticket, BookOpen, HandHeart, ShoppingBag, Clapperboard,
 };
 
 export function CategoryIcon({ name, className }) {

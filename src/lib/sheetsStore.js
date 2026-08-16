@@ -49,16 +49,109 @@ async function findSpreadsheetId() {
 
 // Seeded once, only into a brand-new spreadsheet — never re-added later, so
 // a user who deletes all of them (to build their own set) stays that way.
+// Each top-level category carries a few common subcategories (parent_id set
+// to the parent's freshly generated id below) so a fresh account starts with
+// a real, usable breakdown instead of one flat bucket per area of spending.
+// Names are bilingual — localName() picks the one matching whatever language
+// was active at signup, read straight from the same localStorage key i18n.jsx
+// uses (this file has no access to the React language context).
 const DEFAULT_CATEGORIES = [
-  { name: 'Groceries', icon: 'ShoppingCart', color: '#10b981' },
-  { name: 'Housing', icon: 'Home', color: '#0f172a' },
-  { name: 'Transport', icon: 'Car', color: '#0ea5e9' },
-  { name: 'Dining Out', icon: 'Utensils', color: '#f59e0b' },
-  { name: 'Bills & Utilities', icon: 'Zap', color: '#ef4444' },
-  { name: 'Health', icon: 'Heart', color: '#8b5cf6' },
-  { name: 'Travel', icon: 'Plane', color: '#14b8a6' },
-  { name: 'Gifts', icon: 'Gift', color: '#ec4899' },
+  {
+    name: { en: 'Housing', el: 'Στέγαση' }, icon: 'Home', color: '#0f172a',
+    subcategories: [
+      { name: { en: 'Rent / Mortgage', el: 'Ενοίκιο / Δάνειο' }, icon: 'Key' },
+      { name: { en: 'Electricity', el: 'Ρεύμα' }, icon: 'Zap' },
+      { name: { en: 'Water', el: 'Νερό' }, icon: 'Droplet' },
+      { name: { en: 'Internet', el: 'Internet' }, icon: 'Wifi' },
+      { name: { en: 'Maintenance', el: 'Συντήρηση' }, icon: 'Wrench' },
+    ],
+  },
+  {
+    name: { en: 'Transport', el: 'Μετακίνηση' }, icon: 'Car', color: '#0ea5e9',
+    subcategories: [
+      { name: { en: 'Fuel', el: 'Καύσιμα' }, icon: 'Fuel' },
+      { name: { en: 'Public Transit', el: 'Μέσα Μαζικής Μεταφοράς' }, icon: 'Bus' },
+      { name: { en: 'Parking', el: 'Στάθμευση' }, icon: 'ParkingCircle' },
+      { name: { en: 'Service & Repairs', el: 'Συντήρηση & Επισκευές' }, icon: 'Wrench' },
+      { name: { en: 'Insurance', el: 'Ασφάλεια' }, icon: 'Shield' },
+    ],
+  },
+  {
+    name: { en: 'Groceries', el: 'Τρόφιμα' }, icon: 'ShoppingCart', color: '#10b981',
+    subcategories: [
+      { name: { en: 'Supermarket', el: 'Σούπερμάρκετ' }, icon: 'ShoppingCart' },
+      { name: { en: 'Fresh Market', el: 'Λαϊκή Αγορά' }, icon: 'Carrot' },
+    ],
+  },
+  {
+    name: { en: 'Dining Out', el: 'Εστίαση' }, icon: 'Utensils', color: '#f59e0b',
+    subcategories: [
+      { name: { en: 'Restaurants', el: 'Εστιατόρια' }, icon: 'Utensils' },
+      { name: { en: 'Coffee & Cafés', el: 'Καφετέριες' }, icon: 'Coffee' },
+      { name: { en: 'Takeout & Delivery', el: 'Take Away & Delivery' }, icon: 'Package' },
+    ],
+  },
+  {
+    name: { en: 'Bills & Subscriptions', el: 'Λογαριασμοί & Συνδρομές' }, icon: 'Zap', color: '#ef4444',
+    subcategories: [
+      { name: { en: 'Phone', el: 'Τηλέφωνο' }, icon: 'Smartphone' },
+      { name: { en: 'Streaming', el: 'Streaming' }, icon: 'Tv' },
+      { name: { en: 'Software & Apps', el: 'Λογισμικό & Εφαρμογές' }, icon: 'Laptop' },
+    ],
+  },
+  {
+    name: { en: 'Health', el: 'Υγεία' }, icon: 'Heart', color: '#8b5cf6',
+    subcategories: [
+      { name: { en: 'Doctor', el: 'Γιατρός' }, icon: 'Stethoscope' },
+      { name: { en: 'Pharmacy', el: 'Φαρμακείο' }, icon: 'Pill' },
+      { name: { en: 'Dental', el: 'Οδοντίατρος' }, icon: 'Smile' },
+      { name: { en: 'Fitness & Gym', el: 'Γυμναστήριο' }, icon: 'Dumbbell' },
+    ],
+  },
+  {
+    name: { en: 'Travel', el: 'Ταξίδια' }, icon: 'Plane', color: '#14b8a6',
+    subcategories: [
+      { name: { en: 'Flights', el: 'Πτήσεις' }, icon: 'Plane' },
+      { name: { en: 'Accommodation', el: 'Διαμονή' }, icon: 'Hotel' },
+      { name: { en: 'Car Rental', el: 'Ενοικίαση Αυτοκινήτου' }, icon: 'Car' },
+    ],
+  },
+  {
+    name: { en: 'Shopping', el: 'Ψώνια' }, icon: 'ShoppingBag', color: '#ec4899',
+    subcategories: [
+      { name: { en: 'Clothing', el: 'Ρούχα' }, icon: 'Shirt' },
+      { name: { en: 'Electronics', el: 'Ηλεκτρονικά' }, icon: 'Monitor' },
+      { name: { en: 'Personal Care', el: 'Προσωπική Φροντίδα' }, icon: 'Sparkles' },
+    ],
+  },
+  {
+    name: { en: 'Entertainment', el: 'Ψυχαγωγία' }, icon: 'Clapperboard', color: '#f97316',
+    subcategories: [
+      { name: { en: 'Movies & Shows', el: 'Ταινίες & Σειρές' }, icon: 'Film' },
+      { name: { en: 'Hobbies & Games', el: 'Χόμπι & Παιχνίδια' }, icon: 'Gamepad2' },
+      { name: { en: 'Events', el: 'Εκδηλώσεις' }, icon: 'Ticket' },
+    ],
+  },
+  {
+    name: { en: 'Education', el: 'Εκπαίδευση' }, icon: 'GraduationCap', color: '#6366f1',
+    subcategories: [
+      { name: { en: 'Tuition', el: 'Δίδακτρα' }, icon: 'GraduationCap' },
+      { name: { en: 'Books & Supplies', el: 'Βιβλία & Υλικά' }, icon: 'BookOpen' },
+    ],
+  },
+  {
+    name: { en: 'Gifts & Donations', el: 'Δώρα & Δωρεές' }, icon: 'Gift', color: '#84cc16',
+    subcategories: [
+      { name: { en: 'Gifts', el: 'Δώρα' }, icon: 'Gift' },
+      { name: { en: 'Charity & Donations', el: 'Φιλανθρωπία & Δωρεές' }, icon: 'HandHeart' },
+    ],
+  },
 ];
+
+function localName(name) {
+  const lang = localStorage.getItem('expensetrack_language');
+  return (lang === 'el' && name.el) || name.en;
+}
 
 async function createSpreadsheet() {
   const created = await sheetsFetch('', {
@@ -71,7 +164,14 @@ async function createSpreadsheet() {
   const spreadsheetId = created.spreadsheetId;
   const now = new Date().toISOString();
   // Row shape must match Category's toRow encoding below: id, name, icon, color, parent_id, sort_order, created_date.
-  const defaultCategoryRows = DEFAULT_CATEGORIES.map((c, i) => [crypto.randomUUID(), c.name, c.icon, c.color, '', i, now]);
+  const defaultCategoryRows = [];
+  DEFAULT_CATEGORIES.forEach((c, i) => {
+    const parentId = crypto.randomUUID();
+    defaultCategoryRows.push([parentId, localName(c.name), c.icon, c.color, '', i, now]);
+    (c.subcategories || []).forEach((sub, j) => {
+      defaultCategoryRows.push([crypto.randomUUID(), localName(sub.name), sub.icon, c.color, parentId, j, now]);
+    });
+  });
   await Promise.all(Object.entries(SCHEMAS).map(([title, headers]) =>
     sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(title)}!A1:append?valueInputOption=RAW`, {
       method: 'POST',
