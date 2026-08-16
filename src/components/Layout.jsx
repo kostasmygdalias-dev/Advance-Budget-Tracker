@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Target, PiggyBank, BarChart3, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useDarkMode } from '@/hooks/use-dark-mode';
@@ -20,6 +20,7 @@ const getNav = (t) => [
   { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
   { to: '/recurring', label: t('nav.recurring'), icon: Repeat },
   { to: '/goals', label: t('nav.goals'), icon: Target },
+  { to: '/categories', label: t('nav.categories'), icon: FolderTree },
   { to: '/budgets', label: t('nav.budgets'), icon: PiggyBank },
   { to: '/reports', label: t('nav.reports'), icon: BarChart3 },
   { to: '/settings', label: t('nav.settings'), icon: SettingsIcon },
