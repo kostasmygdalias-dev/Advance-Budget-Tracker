@@ -418,7 +418,12 @@ export default function Dashboard() {
       </div>
 
       <Card className="p-5">
-        <p className="text-sm font-medium mb-4">Monthly trend — income vs expenses</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-medium">Monthly trend — income vs expenses</p>
+          <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground underline">
+            View reports
+          </Link>
+        </div>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>

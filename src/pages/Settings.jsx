@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3 } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -304,6 +304,11 @@ export default function Settings() {
         <Link to="/categories">
           <Button variant="outline">
             <FolderTree className="w-4 h-4 mr-1" /> Manage categories
+          </Button>
+        </Link>
+        <Link to="/reports">
+          <Button variant="outline">
+            <BarChart3 className="w-4 h-4 mr-1" /> View reports
           </Button>
         </Link>
       </div>
