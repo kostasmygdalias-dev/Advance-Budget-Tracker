@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Search, ChevronDown, ChevronRight, Pencil, Copy, Trash2, Layers } from 'lucide-react';
-import { monthLabel } from '@/lib/finance';
+import { Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers } from 'lucide-react';
+import { monthLabel, currentMonthStr } from '@/lib/finance';
 import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
@@ -40,6 +40,12 @@ const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
+
+function shiftMonth(monthStr, delta) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
 
 function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
   const color = cat?.color || '#94a3b8';
@@ -129,6 +135,10 @@ export default function Transactions() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialType = ['income', 'expense'].includes(searchParams.get('type')) ? searchParams.get('type') : 'all';
+  // Month-first browsing by default (like the month navigator this mirrors) —
+  // "all time" is an explicit opt-out (?month=all), not the starting point.
+  const monthParam = searchParams.get('month');
+  const initialMonth = monthParam === 'all' ? null : (monthParam || currentMonthStr());
 
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
@@ -137,9 +147,10 @@ export default function Transactions() {
   const [loadError, setLoadError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [type, setType] = useState(initialType);
+  const [month, setMonth] = useState(initialMonth);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [filters, setFilters] = useState({
-    search: '', category_id: 'all', payment_method: 'all', source: 'all', from: '', to: '',
+    search: '', category_id: 'all', payment_method: 'all', source: 'all',
   });
 
   const load = () => {
@@ -165,9 +176,22 @@ export default function Transactions() {
 
   useEffect(load, []);
 
+  const syncParams = (nextType, nextMonth) => {
+    const params = {};
+    if (nextType !== 'all') params.type = nextType;
+    if (nextMonth === null) params.month = 'all';
+    else if (nextMonth !== currentMonthStr()) params.month = nextMonth;
+    setSearchParams(params, { replace: true });
+  };
+
   const changeType = (next) => {
     setType(next);
-    setSearchParams(next === 'all' ? {} : { type: next }, { replace: true });
+    syncParams(next, month);
+  };
+
+  const changeMonth = (next) => {
+    setMonth(next);
+    syncParams(type, next);
   };
 
   const catMap = useMemo(() => {
@@ -184,17 +208,28 @@ export default function Transactions() {
 
   const filtered = useMemo(() => {
     return combined.filter((row) => {
+      if (month && !(row._date || '').startsWith(month)) return false;
       if (type !== 'all' && row._type !== type) return false;
       if (filters.search && !(row.description || '').toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (row._type === 'expense') {
         if (filters.category_id !== 'all' && row.category_id !== filters.category_id) return false;
         if (filters.payment_method !== 'all' && row.payment_method !== filters.payment_method) return false;
       } else if (filters.source !== 'all' && row.source !== filters.source) return false;
-      if (filters.from && row._date < filters.from) return false;
-      if (filters.to && row._date > filters.to) return false;
       return true;
     });
-  }, [combined, type, filters]);
+  }, [combined, type, month, filters]);
+
+  // Grouped by currency rather than blindly summed — mixing currencies into
+  // one number would be silently wrong (same reasoning as the Dashboard fix).
+  const filteredTotals = useMemo(() => {
+    const byCurrency = {};
+    filtered.forEach((row) => {
+      const cur = row.currency || 'EUR';
+      const signed = row._type === 'income' ? row.amount : -row.amount;
+      byCurrency[cur] = (byCurrency[cur] || 0) + signed;
+    });
+    return byCurrency;
+  }, [filtered]);
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
@@ -278,13 +313,42 @@ export default function Transactions() {
         </DropdownMenu>
       </div>
 
-      <Tabs value={type} onValueChange={changeType}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="income">Income</TabsTrigger>
-          <TabsTrigger value="expense">Expenses</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Card className="p-3 flex items-center justify-between gap-3">
+        {month ? (
+          <>
+            <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, -1))}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <button onClick={() => changeMonth(null)} className="text-sm font-medium hover:underline">
+              {monthLabel(month)}
+            </button>
+            <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <span />
+            <button onClick={() => changeMonth(currentMonthStr())} className="text-sm font-medium hover:underline">
+              All time
+            </button>
+            <span />
+          </>
+        )}
+      </Card>
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <Tabs value={type} onValueChange={changeType}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="income">Income</TabsTrigger>
+            <TabsTrigger value="expense">Expenses</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {filtered.length} · {Object.entries(filteredTotals).map(([cur, val]) => fmt(val, cur)).join(', ') || fmt(0)}
+        </p>
+      </div>
 
       <Card className="p-4 space-y-3">
         <div className="relative">
@@ -330,8 +394,6 @@ export default function Transactions() {
               </SelectContent>
             </Select>
           )}
-          <Input type="date" value={filters.from} onChange={(e) => set('from', e.target.value)} />
-          <Input type="date" value={filters.to} onChange={(e) => set('to', e.target.value)} />
         </div>
       </Card>
 

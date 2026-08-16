@@ -32,7 +32,7 @@ export default function AddEditIncome() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/transactions?type=income">
+        <Link to="/transactions?type=income&month=all">
           <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
@@ -41,8 +41,8 @@ export default function AddEditIncome() {
       </div>
       <IncomeForm
         initialIncome={income}
-        onSaved={() => navigate('/transactions?type=income')}
-        onCancel={() => navigate('/transactions?type=income')}
+        onSaved={() => navigate('/transactions?type=income&month=all')}
+        onCancel={() => navigate('/transactions?type=income&month=all')}
       />
     </div>
   );

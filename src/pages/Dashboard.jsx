@@ -39,8 +39,9 @@ function monthName(monthStr) {
 }
 
 // Numbers-and-a-graph only, no explanatory labels — the month name is the
-// only text. The donut is just income vs. expenses split.
-function MonthWidget({ label, income, expenses, currency }) {
+// only text. The donut is just income vs. expenses split. Clicking it goes
+// to that specific month's transactions.
+function MonthWidget({ label, month, income, expenses, currency }) {
   const net = income - expenses;
   const total = income + expenses;
   const data = total > 0
@@ -49,39 +50,44 @@ function MonthWidget({ label, income, expenses, currency }) {
   const colors = total > 0 ? ['#10b981', '#ef4444'] : ['#e5e7eb'];
 
   return (
-    <Card className="p-5">
-      <p className="text-sm font-medium mb-3">{label}</p>
-      <div className="flex items-center gap-5">
-        <div className="w-20 h-20 shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={data} dataKey="value" innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} paddingAngle={total > 0 ? 3 : 0}>
-                {data.map((d, i) => <Cell key={i} fill={colors[i]} />)}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+    <Link to={`/transactions?month=${month}`} className="block group">
+      <Card className="p-5 transition-colors group-hover:border-foreground/20">
+        <p className="text-sm font-medium mb-3">{label}</p>
+        <div className="flex items-center gap-5">
+          <div className="w-20 h-20 shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={data} dataKey="value" innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} paddingAngle={total > 0 ? 3 : 0}>
+                  {data.map((d, i) => <Cell key={i} fill={colors[i]} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-1.5">
+            <p className="flex items-center gap-1.5 text-emerald-600 font-semibold tabular-nums">
+              <ArrowUp className="w-3.5 h-3.5" /> {fmt(income, currency)}
+            </p>
+            <p className="flex items-center gap-1.5 text-destructive font-semibold tabular-nums">
+              <ArrowDown className="w-3.5 h-3.5" /> {fmt(expenses, currency)}
+            </p>
+            <p className={`font-semibold tabular-nums pt-1.5 border-t ${net >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+              {net >= 0 ? '+' : ''}{fmt(net, currency)}
+            </p>
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <p className="flex items-center gap-1.5 text-emerald-600 font-semibold tabular-nums">
-            <ArrowUp className="w-3.5 h-3.5" /> {fmt(income, currency)}
-          </p>
-          <p className="flex items-center gap-1.5 text-destructive font-semibold tabular-nums">
-            <ArrowDown className="w-3.5 h-3.5" /> {fmt(expenses, currency)}
-          </p>
-          <p className={`font-semibold tabular-nums pt-1.5 border-t ${net >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-            {net >= 0 ? '+' : ''}{fmt(net, currency)}
-          </p>
-        </div>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
 // The whole card is a link to Transactions — a summary widget, not a place
 // to edit from, so one click target for the row is enough.
 function RecentTransactions({ rows, catMap }) {
+  // month=all: this list isn't scoped to the current month, so the newest
+  // entry shown here could be from last month — the default current-month
+  // view on Transactions could otherwise hide exactly what was just clicked.
   return (
-    <Link to="/transactions" className="block group">
+    <Link to="/transactions?month=all" className="block group">
       <Card className="p-5 transition-colors group-hover:border-foreground/20">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium">Recent transactions</p>
@@ -329,8 +335,8 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <MonthWidget label={monthName(thisMonth)} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />
-        <MonthWidget label={monthName(lastMonth)} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />
+        <MonthWidget label={monthName(thisMonth)} month={thisMonth} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />
+        <MonthWidget label={monthName(lastMonth)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />
       </div>
 
       <RecentTransactions rows={recentTransactions} catMap={catMap} />

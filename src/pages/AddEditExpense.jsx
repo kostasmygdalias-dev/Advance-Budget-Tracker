@@ -29,10 +29,13 @@ export default function AddEditExpense() {
   if (loading) return <PageSkeleton rows={2} />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
+  // month=all, not the default current-month view: this expense's date might
+  // not be in the current month (editing an old entry), and Transactions
+  // would otherwise default to a month that hides what was just saved.
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/transactions?type=expense">
+        <Link to="/transactions?type=expense&month=all">
           <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
@@ -41,8 +44,8 @@ export default function AddEditExpense() {
       </div>
       <ExpenseForm
         initialExpense={expense}
-        onSaved={() => navigate('/transactions?type=expense')}
-        onCancel={() => navigate('/transactions?type=expense')}
+        onSaved={() => navigate('/transactions?type=expense&month=all')}
+        onCancel={() => navigate('/transactions?type=expense&month=all')}
       />
     </div>
   );
