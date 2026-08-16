@@ -109,7 +109,11 @@
       "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs?per_page=3\")",
       "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs?per_page=1\")",
       "Bash(npx wrangler *)",
-      "Bash(node /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/check2.mjs /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/final6.png)"
+      "Bash(node /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/check2.mjs /private/tmp/claude-501/-Users-mygdalias-Developer-Advance-Budget-Tracker/2124173d-1882-45d1-a0cf-92d785d8f3bd/scratchpad/final6.png)",
+      "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs/31837775178/jobs\")",
+      "Bash(curl -sI \"https://custom.devcoresolutions.gr/assets/index-B0DQ_z99.js\")",
+      "Bash(curl -s \"https://custom.devcoresolutions.gr/assets/index-B0DQ_z99.js\")",
+      "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\" -o /tmp/live_check.html)"
     ],
     "additionalDirectories": [
       "\\tmp"
