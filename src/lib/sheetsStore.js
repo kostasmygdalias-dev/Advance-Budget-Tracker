@@ -153,6 +153,42 @@ function localName(name) {
   return (lang === 'el' && name.el) || name.en;
 }
 
+// Merges the default taxonomy into an account whose spreadsheet already
+// existed before these categories were introduced — createSpreadsheet()
+// above only seeds a brand-new one, so anyone with an existing account
+// needs an explicit way to pull them in. Matches by name (case-insensitive)
+// against what's already there, so it's safe to run more than once and
+// never creates a duplicate "Housing" next to one the user already has —
+// missing subcategories just get added under it. Returns how many rows
+// (parents + subcategories) were actually created.
+export async function addMissingDefaultCategories() {
+  const existing = await Category.list();
+  const byName = (list, parentId, name) =>
+    list.find((c) => (c.parent_id || null) === parentId && c.name.trim().toLowerCase() === name.trim().toLowerCase());
+
+  let added = 0;
+  for (const cat of DEFAULT_CATEGORIES) {
+    const wantedName = localName(cat.name);
+    let parent = byName(existing, null, wantedName);
+    if (!parent) {
+      const topLevelCount = existing.filter((c) => !c.parent_id).length;
+      parent = await Category.create({ name: wantedName, icon: cat.icon, color: cat.color, parent_id: null, sort_order: topLevelCount });
+      existing.push(parent);
+      added++;
+    }
+    let nextSort = existing.filter((c) => c.parent_id === parent.id).length;
+    for (const sub of cat.subcategories || []) {
+      const subName = localName(sub.name);
+      if (byName(existing, parent.id, subName)) continue;
+      const created = await Category.create({ name: subName, icon: sub.icon, color: parent.color || cat.color, parent_id: parent.id, sort_order: nextSort });
+      existing.push(created);
+      nextSort++;
+      added++;
+    }
+  }
+  return added;
+}
+
 async function createSpreadsheet() {
   const created = await sheetsFetch('', {
     method: 'POST',

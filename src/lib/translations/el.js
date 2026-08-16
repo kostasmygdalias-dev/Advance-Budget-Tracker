@@ -288,6 +288,10 @@ export const el = {
     noneTopLevel: 'Καμία (ανώτατο επίπεδο)',
     color: 'Χρώμα',
     icon: 'Εικονίδιο',
+    addDefaults: 'Προσθήκη βασικών κατηγοριών',
+    addedDefaultsOne: 'Προστέθηκε {{count}} κατηγορία',
+    addedDefaultsOther: 'Προστέθηκαν {{count}} κατηγορίες',
+    allDefaultsExist: 'Έχετε ήδη όλες τις προεπιλεγμένες κατηγορίες',
   },
 
   expenseForm: {

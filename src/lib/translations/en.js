@@ -288,6 +288,10 @@ export const en = {
     noneTopLevel: 'None (top level)',
     color: 'Color',
     icon: 'Icon',
+    addDefaults: 'Add starter categories',
+    addedDefaultsOne: '{{count}} category added',
+    addedDefaultsOther: '{{count}} categories added',
+    allDefaultsExist: 'You already have all the default categories',
   },
 
   expenseForm: {

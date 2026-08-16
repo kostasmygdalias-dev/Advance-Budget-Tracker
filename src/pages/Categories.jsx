@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { entities } from '@/lib/sheetsStore';
+import { entities, addMissingDefaultCategories } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, Sparkles } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -23,6 +23,7 @@ export default function Categories() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null); // {id?, name, icon, color, parent_id}
+  const [addingDefaults, setAddingDefaults] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -65,6 +66,23 @@ export default function Categories() {
     load();
   };
 
+  const addDefaults = async () => {
+    setAddingDefaults(true);
+    try {
+      const added = await addMissingDefaultCategories();
+      load();
+      toast({
+        title: added === 0
+          ? t('categories.allDefaultsExist')
+          : (added === 1 ? t('categories.addedDefaultsOne', { count: added }) : t('categories.addedDefaultsOther', { count: added })),
+      });
+    } catch (err) {
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
+    } finally {
+      setAddingDefaults(false);
+    }
+  };
+
   const byOrder = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
   const topLevel = categories.filter((c) => !c.parent_id).sort(byOrder);
   const childrenOf = (id) => categories.filter((c) => c.parent_id === id).sort(byOrder);
@@ -88,9 +106,14 @@ export default function Categories() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('categories.title')}</h1>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> {t('common.add')}</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={addDefaults} disabled={addingDefaults}>
+            <Sparkles className="w-4 h-4 mr-1" /> {t('categories.addDefaults')}
+          </Button>
+          <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> {t('common.add')}</Button>
+        </div>
       </div>
 
       {topLevel.length === 0 && (
