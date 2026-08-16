@@ -431,24 +431,26 @@ export default function Dashboard() {
         );
       case 'budget':
         return (
-          <Card className="p-5 h-full">
-            <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? 'Weekly' : 'Monthly'} budget</p>
-            <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
-              {budget ? fmt(budget, currency) : '—'}
-            </p>
-            {budget > 0 && (
-              <div className="mt-3">
-                <div className="relative h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? '#ef4444' : '#0f172a' }}
-                  />
-                  <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40" style={{ left: `${periodProgressPct}%` }} title="Today" />
+          <Link to="/budgets" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? 'Weekly' : 'Monthly'} budget</p>
+              <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
+                {budget ? fmt(budget, currency) : '—'}
+              </p>
+              {budget > 0 && (
+                <div className="mt-3">
+                  <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? '#ef4444' : '#0f172a' }}
+                    />
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40" style={{ left: `${periodProgressPct}%` }} title="Today" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used · {periodProgressPct.toFixed(0)}% through the {budgetPeriod === 'weekly' ? 'week' : 'month'}</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used · {periodProgressPct.toFixed(0)}% through the {budgetPeriod === 'weekly' ? 'week' : 'month'}</p>
-              </div>
-            )}
-          </Card>
+              )}
+            </Card>
+          </Link>
         );
       case 'avgSpent':
         return (

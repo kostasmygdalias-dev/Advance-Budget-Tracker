@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3 } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -73,19 +72,12 @@ export default function Settings() {
   useEffect(load, []);
 
   const update = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
-  const updateBudget = (catId, v) =>
-    setSettings((s) => ({
-      ...s,
-      budget_per_category: { ...(s.budget_per_category || {}), [catId]: v === '' ? null : parseFloat(v) },
-    }));
 
   const save = async () => {
     setSaving(true);
     try {
       await entities.Settings.update(settings.id, {
         default_currency: settings.default_currency,
-        monthly_budget_total: settings.monthly_budget_total || null,
-        budget_per_category: settings.budget_per_category || {},
         budget_period: settings.budget_period || 'monthly',
       });
       toast({ title: 'Settings saved' });
@@ -228,42 +220,8 @@ export default function Settings() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="budget">{(settings.budget_period || 'monthly') === 'weekly' ? 'Weekly' : 'Monthly'} budget total</Label>
-            <Input
-              id="budget"
-              type="number"
-              step="0.01"
-              value={settings.monthly_budget_total ?? ''}
-              onChange={(e) => update('monthly_budget_total', e.target.value === '' ? null : parseFloat(e.target.value))}
-              placeholder="Optional"
-            />
-          </div>
         </div>
       </Card>
-
-      {categories.length > 0 && (
-        <Card className="p-5 space-y-4">
-          <p className="text-sm font-medium">Budget per category</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {categories.map((c) => (
-              <div key={c.id} className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ background: c.color || '#94a3b8' }} />
-                  {c.name}
-                </Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={settings.budget_per_category?.[c.id] ?? ''}
-                  onChange={(e) => updateBudget(c.id, e.target.value)}
-                  placeholder="Optional"
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       <Card className="p-5 space-y-4">
         <div>
@@ -304,6 +262,11 @@ export default function Settings() {
         <Link to="/categories">
           <Button variant="outline">
             <FolderTree className="w-4 h-4 mr-1" /> Manage categories
+          </Button>
+        </Link>
+        <Link to="/budgets">
+          <Button variant="outline">
+            <Wallet className="w-4 h-4 mr-1" /> Manage budgets
           </Button>
         </Link>
         <Link to="/reports">

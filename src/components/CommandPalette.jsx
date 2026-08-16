@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Target, Settings as SettingsIcon, Plus, TrendingDown, TrendingUp, FolderTree, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Target, Settings as SettingsIcon, Plus, TrendingDown, TrendingUp, FolderTree, BarChart3, Wallet } from 'lucide-react';
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/ui/command';
@@ -24,6 +24,7 @@ export default function CommandPalette({ open, onOpenChange }) {
           <CommandItem onSelect={() => go('/goals')}><Target className="mr-2 h-4 w-4" /> Goals</CommandItem>
           <CommandItem onSelect={() => go('/goals?tab=debts')}><Target className="mr-2 h-4 w-4" /> Debts &amp; IOUs</CommandItem>
           <CommandItem onSelect={() => go('/categories')}><FolderTree className="mr-2 h-4 w-4" /> Categories</CommandItem>
+          <CommandItem onSelect={() => go('/budgets')}><Wallet className="mr-2 h-4 w-4" /> Budgets</CommandItem>
           <CommandItem onSelect={() => go('/reports')}><BarChart3 className="mr-2 h-4 w-4" /> Reports</CommandItem>
           <CommandItem onSelect={() => go('/settings')}><SettingsIcon className="mr-2 h-4 w-4" /> Settings</CommandItem>
         </CommandGroup>
