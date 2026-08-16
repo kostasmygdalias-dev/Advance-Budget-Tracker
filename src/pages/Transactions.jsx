@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -49,7 +50,49 @@ function shiftMonth(monthStr, delta) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
 
-function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
+// Clicking the row's category icon re-categorizes the transaction directly
+// from the list — picking a category here changes what the transaction is
+// filed under, not the category's own icon (that's the picker on the
+// Categories page).
+function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const color = cat?.color || '#94a3b8';
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-1" align="start">
+        <div className="max-h-72 overflow-y-auto space-y-0.5">
+          <button
+            type="button"
+            onClick={() => { onPick(null); setOpen(false); }}
+            className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${!categoryId ? 'bg-muted' : ''}`}
+          >
+            <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color="#94a3b8" className="w-6 h-6" />
+            {t('transactions.uncategorized')}
+          </button>
+          {flattenCategoryTree(categories).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => { onPick(c.id); setOpen(false); }}
+              className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${c.depth > 0 ? 'pl-6 text-muted-foreground' : ''} ${c.id === categoryId ? 'bg-muted' : ''}`}
+            >
+              <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-6 h-6" />
+              {c.depth > 0 ? '↳ ' : ''}{c.name}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
   const { t, lang } = useLanguage();
   const PAYMENT_METHODS = getPaymentMethods(t);
   const color = cat?.color || '#94a3b8';
@@ -64,7 +107,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconc
             <span className="w-4" />
           )}
         </button>
-        <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} />
+        <CategoryPickerButton categoryId={e.category_id} cat={cat} categories={categories} onPick={onChangeCategory} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-medium truncate">{e.description}</p>
@@ -275,6 +318,17 @@ export default function Transactions() {
     }
   };
 
+  const changeCategory = async (row, categoryId) => {
+    const previous = row.category_id;
+    setExpenses((prev) => prev.map((e) => (e.id === row.id ? { ...e, category_id: categoryId } : e)));
+    try {
+      await entities.Expense.update(row.id, { category_id: categoryId });
+    } catch (err) {
+      setExpenses((prev) => prev.map((e) => (e.id === row.id ? { ...e, category_id: previous } : e)));
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
+    }
+  };
+
   const toggleReconciled = async (row) => {
     try {
       if (row._type === 'expense') {
@@ -419,6 +473,8 @@ export default function Transactions() {
               key={row.id}
               e={row}
               cat={row.category_id ? catMap[row.category_id] : null}
+              categories={categories}
+              onChangeCategory={(categoryId) => changeCategory(row, categoryId)}
               isOpen={!!expanded[row.id]}
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
               onCopy={() => copyRow(row)}
