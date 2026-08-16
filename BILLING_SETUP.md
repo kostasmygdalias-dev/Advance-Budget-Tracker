@@ -29,8 +29,8 @@ details): **Cloudflare** (free tier is enough) and **Stripe**.
    ```bash
    npx wrangler kv namespace create SUBSCRIPTIONS
    ```
-   It prints something like `id = "abcd1234..."`. Open `worker/wrangler.toml`
-   and replace `REPLACE_WITH_KV_NAMESPACE_ID` with that id.
+   It prints something like `id = "abcd1234..."`. Open `worker/wrangler.jsonc`
+   and put that id in the `kv_namespaces` entry.
 4. Get your Account ID: `npx wrangler whoami` prints it, or it's in the
    Cloudflare dashboard sidebar on any domain/Workers page.
 5. Create an API token for GitHub Actions to deploy with: Cloudflare
@@ -41,7 +41,7 @@ details): **Cloudflare** (free tier is enough) and **Stripe**.
    add:
    - `CLOUDFLARE_API_TOKEN` — the token from step 5
    - `CLOUDFLARE_ACCOUNT_ID` — the account ID from step 4
-7. Commit the `wrangler.toml` change from step 3 and push. The
+7. Commit the `wrangler.jsonc` change from step 3 and push. The
    **Deploy billing Worker** GitHub Action will run and deploy it. Find the
    deployed URL either in that workflow's log output, or run:
    ```bash

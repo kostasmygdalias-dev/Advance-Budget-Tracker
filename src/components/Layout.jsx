@@ -13,11 +13,25 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+function PlanBadge({ isPro }) {
+  return (
+    <span
+      className={cn(
+        'text-[10px] font-semibold tracking-wide rounded-full px-1.5 py-0.5',
+        isPro ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted'
+      )}
+    >
+      {isPro ? 'PRO' : 'FREE'}
+    </span>
+  );
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { active: subActive, configured: billingConfigured } = useSubscription();
+  const { active: subActive, configured: billingConfigured, loading: subLoading } = useSubscription();
+  const isPro = billingConfigured && subActive;
   const showProBadge = billingConfigured && !subActive;
 
   const handleLogout = async () => {
@@ -34,6 +48,7 @@ export default function Layout() {
         <div className="flex items-center gap-2 px-6 h-16 border-b">
           <Wallet className="w-5 h-5 text-primary" />
           <span className="font-heading font-semibold tracking-tight">ExpenseTrack</span>
+          {!subLoading && <PlanBadge isPro={isPro} />}
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((item) => {
@@ -73,6 +88,7 @@ export default function Layout() {
         <div className="flex items-center gap-2">
           <Wallet className="w-5 h-5 text-primary" />
           <span className="font-heading font-semibold">ExpenseTrack</span>
+          {!subLoading && <PlanBadge isPro={isPro} />}
         </div>
         <button onClick={handleLogout} aria-label="Log out">
           <LogOut className="w-5 h-5 text-muted-foreground" />
