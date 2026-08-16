@@ -1,14 +1,18 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, TrendingUp, FolderTree, Repeat, Settings as SettingsIcon, Wallet, LogOut } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
+import { openBillingPortal } from '@/lib/subscription';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { to: '/income', label: 'Income', icon: TrendingUp },
-  { to: '/expenses', label: 'Expenses', icon: Receipt },
-  { to: '/categories', label: 'Categories', icon: FolderTree },
+  { to: '/transactions', label: 'Transactions', icon: Receipt },
   { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -26,11 +30,55 @@ function PlanBadge({ isPro }) {
   );
 }
 
+function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, children }) {
+  const { toast } = useToast();
+
+  const manageSubscription = async () => {
+    try {
+      await openBillingPortal();
+    } catch (err) {
+      toast({ title: 'Could not open billing portal', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel className="font-normal">
+          <p className="text-sm font-medium">{isPro ? 'Pro plan' : 'Free plan'}</p>
+          {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+        </DropdownMenuLabel>
+        {billingConfigured && (
+          <>
+            <DropdownMenuSeparator />
+            {isPro ? (
+              <DropdownMenuItem onSelect={manageSubscription}>
+                <Crown className="w-4 h-4 mr-2" /> Manage subscription
+              </DropdownMenuItem>
+            ) : (
+              upgradeUrl && (
+                <DropdownMenuItem onSelect={() => { window.location.href = upgradeUrl; }}>
+                  <Crown className="w-4 h-4 mr-2" /> Upgrade to Pro
+                </DropdownMenuItem>
+              )
+            )}
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onLogout}>
+          <LogOut className="w-4 h-4 mr-2" /> Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const { active: subActive, configured: billingConfigured, loading: subLoading } = useSubscription();
+  const { logout, user } = useAuth();
+  const { active: subActive, configured: billingConfigured, loading: subLoading, upgradeUrl } = useSubscription();
   const isPro = billingConfigured && subActive;
   const showProBadge = billingConfigured && !subActive;
 
@@ -45,11 +93,14 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background">
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col border-r bg-sidebar">
-        <div className="flex items-center gap-2 px-6 h-16 border-b">
-          <Wallet className="w-5 h-5 text-primary" />
-          <span className="font-heading font-semibold tracking-tight">ExpenseTrack</span>
-          {!subLoading && <PlanBadge isPro={isPro} />}
-        </div>
+        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout}>
+          <button className="flex items-center gap-2 px-6 h-16 border-b w-full hover:bg-sidebar-accent/40 transition-colors">
+            <Wallet className="w-5 h-5 text-primary shrink-0" />
+            <span className="font-heading font-semibold tracking-tight flex-1 text-left truncate">ExpenseTrack</span>
+            {!subLoading && <PlanBadge isPro={isPro} />}
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        </AccountMenu>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -74,25 +125,17 @@ export default function Layout() {
             );
           })}
         </nav>
-        <div className="p-3 border-t">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
-          >
-            <LogOut className="w-4 h-4" /> Log out
-          </button>
-        </div>
       </aside>
 
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 border-b bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-primary" />
-          <span className="font-heading font-semibold">ExpenseTrack</span>
-          {!subLoading && <PlanBadge isPro={isPro} />}
-        </div>
-        <button onClick={handleLogout} aria-label="Log out">
-          <LogOut className="w-5 h-5 text-muted-foreground" />
-        </button>
+      <header className="md:hidden sticky top-0 z-30 flex items-center px-4 h-14 border-b bg-background/95 backdrop-blur">
+        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout}>
+          <button className="flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-primary" />
+            <span className="font-heading font-semibold">ExpenseTrack</span>
+            {!subLoading && <PlanBadge isPro={isPro} />}
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </AccountMenu>
       </header>
 
       <main className="md:pl-60 pb-20 md:pb-0">

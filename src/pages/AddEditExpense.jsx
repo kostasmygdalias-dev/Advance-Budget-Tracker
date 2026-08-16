@@ -32,7 +32,7 @@ export default function AddEditExpense() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/expenses">
+        <Link to="/transactions?type=expense">
           <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
@@ -41,8 +41,8 @@ export default function AddEditExpense() {
       </div>
       <ExpenseForm
         initialExpense={expense}
-        onSaved={() => navigate('/expenses')}
-        onCancel={() => navigate('/expenses')}
+        onSaved={() => navigate('/transactions?type=expense')}
+        onCancel={() => navigate('/transactions?type=expense')}
       />
     </div>
   );

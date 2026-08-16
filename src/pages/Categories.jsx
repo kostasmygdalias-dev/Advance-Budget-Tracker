@@ -87,7 +87,7 @@ export default function Categories() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Categories</h1>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New</Button>
+        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> Add</Button>
       </div>
 
       {topLevel.length === 0 && (

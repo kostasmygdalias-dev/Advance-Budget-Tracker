@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
@@ -13,9 +13,8 @@ import Layout from '@/components/Layout';
 // downloads and parses the JS that page actually needs — e.g. the Login
 // screen no longer has to load Recharts, dnd-kit, date-fns, etc. up front.
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const ExpenseList = lazy(() => import('@/pages/ExpenseList'));
+const Transactions = lazy(() => import('@/pages/Transactions'));
 const AddEditExpense = lazy(() => import('@/pages/AddEditExpense'));
-const IncomeList = lazy(() => import('@/pages/IncomeList'));
 const AddEditIncome = lazy(() => import('@/pages/AddEditIncome'));
 const Categories = lazy(() => import('@/pages/Categories'));
 const Recurring = lazy(() => import('@/pages/Recurring'));
@@ -40,10 +39,11 @@ const AuthenticatedApp = () => {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/expenses" element={<ExpenseList />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/expenses" element={<Navigate to="/transactions?type=expense" replace />} />
             <Route path="/expenses/new" element={<AddEditExpense />} />
             <Route path="/expenses/:id/edit" element={<AddEditExpense />} />
-            <Route path="/income" element={<IncomeList />} />
+            <Route path="/income" element={<Navigate to="/transactions?type=income" replace />} />
             <Route path="/income/new" element={<AddEditIncome />} />
             <Route path="/income/:id/edit" element={<AddEditIncome />} />
             <Route path="/categories" element={<Categories />} />

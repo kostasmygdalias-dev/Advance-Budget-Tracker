@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, CheckCircle2, Crown } from 'lucide-react';
+import { Save, Download, CheckCircle2, Crown, FolderTree } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -199,13 +200,18 @@ export default function Settings() {
         </Card>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button onClick={save} disabled={saving}>
           <Save className="w-4 h-4 mr-1" /> {saving ? 'Saving…' : 'Save settings'}
         </Button>
         <Button variant="outline" onClick={exportData}>
           <Download className="w-4 h-4 mr-1" /> Export data (JSON)
         </Button>
+        <Link to="/categories">
+          <Button variant="outline">
+            <FolderTree className="w-4 h-4 mr-1" /> Manage categories
+          </Button>
+        </Link>
       </div>
     </div>
   );

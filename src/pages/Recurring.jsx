@@ -161,7 +161,7 @@ export default function Recurring() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-1" /> New <ChevronDown className="w-4 h-4 ml-1" /></Button>
+            <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => openNew('income')}>Income</DropdownMenuItem>
