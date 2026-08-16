@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { calculateAmortizationSchedule } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import { useLanguage } from '@/lib/i18n';
+import { CATEGORY_ICON_NAMES } from '@/lib/categoryIcons';
 import AmortizationPreview from './AmortizationPreview';
 
 const getPaymentMethods = (t) => [
@@ -24,6 +27,11 @@ const getUnits = (t) => [
   { value: 'month', label: t('expenseForm.units.month') },
   { value: 'year', label: t('expenseForm.units.year') },
 ];
+// Same palette Categories.jsx offers in its color picker — cycled by index
+// so quick-added categories aren't all the same color, without making the
+// user pick one right now (they can refine it later on the Categories page).
+const CATEGORY_COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+const NEW_CATEGORY_VALUE = '__new__';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 // Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
@@ -41,6 +49,9 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categorySaving, setCategorySaving] = useState(false);
   const [form, setForm] = useState({
     description: '',
     amount: '',
@@ -78,6 +89,32 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   }, [initialExpense]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Lets a category be created from right inside the expense form — picking
+  // "+ New category" in the Select opens this instead of setting the value,
+  // so there's no detour to the Categories page and back.
+  const createCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim() || categorySaving) return;
+    setCategorySaving(true);
+    try {
+      const created = await entities.Category.create({
+        name: newCategoryName.trim(),
+        icon: CATEGORY_ICON_NAMES[categories.length % CATEGORY_ICON_NAMES.length],
+        color: CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length],
+        parent_id: null,
+        sort_order: categories.length,
+      });
+      setCategories((prev) => [...prev, created]);
+      set('category_id', created.id);
+      setNewCategoryName('');
+      setCreatingCategory(false);
+    } catch (err) {
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
+    } finally {
+      setCategorySaving(false);
+    }
+  };
 
   const isAmortized = form.expense_type === 'amortized';
   const periodValueNum = parseFloat(form.period_value);
@@ -130,6 +167,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
       <div className="space-y-2">
         <Label htmlFor="description">{t('common.description')}</Label>
@@ -179,12 +217,18 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>{t('common.category')}</Label>
-          <Select value={form.category_id} onValueChange={(v) => set('category_id', v)}>
+          <Select
+            value={form.category_id}
+            onValueChange={(v) => (v === NEW_CATEGORY_VALUE ? setCreatingCategory(true) : set('category_id', v))}
+          >
             <SelectTrigger><SelectValue placeholder={t('expenseForm.categoryPlaceholder')} /></SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
+              <SelectItem value={NEW_CATEGORY_VALUE} className="text-primary font-medium">
+                <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> {t('categories.newCategory')}</span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -293,5 +337,26 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
         )}
       </div>
     </form>
+
+    {creatingCategory && (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setCreatingCategory(false)}>
+        <Card className="p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading font-semibold">{t('categories.newCategory')}</h2>
+            <Button variant="ghost" size="icon" onClick={() => setCreatingCategory(false)}><X className="w-4 h-4" /></Button>
+          </div>
+          <form onSubmit={createCategory} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-cat-name">{t('categories.name')}</Label>
+              <Input id="new-cat-name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} autoFocus />
+            </div>
+            <Button type="submit" className="w-full" disabled={!newCategoryName.trim() || categorySaving}>
+              {categorySaving ? t('common.saving') : t('common.add')}
+            </Button>
+          </form>
+        </Card>
+      </div>
+    )}
+    </>
   );
 }
