@@ -86,6 +86,7 @@ export default function Settings() {
         default_currency: settings.default_currency,
         monthly_budget_total: settings.monthly_budget_total || null,
         budget_per_category: settings.budget_per_category || {},
+        budget_period: settings.budget_period || 'monthly',
       });
       toast({ title: 'Settings saved' });
     } catch (err) {
@@ -218,7 +219,17 @@ export default function Settings() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="budget">Monthly budget total</Label>
+            <Label>Budget period</Label>
+            <Select value={settings.budget_period || 'monthly'} onValueChange={(v) => update('budget_period', v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="budget">{(settings.budget_period || 'monthly') === 'weekly' ? 'Weekly' : 'Monthly'} budget total</Label>
             <Input
               id="budget"
               type="number"

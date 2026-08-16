@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -40,11 +41,12 @@ const todayStr = () => {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
-function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete }) {
+function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
   const color = cat?.color || '#94a3b8';
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
+        <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title="Reconciled" />
         <button onClick={onToggle} className="text-muted-foreground">
           {e.expense_type === 'amortized' ? (
             isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
@@ -95,11 +97,12 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete }) {
   );
 }
 
-function IncomeRow({ i, onCopy, onDelete }) {
+function IncomeRow({ i, onCopy, onDelete, onToggleReconciled }) {
   const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
       <div className="flex items-center gap-3 p-4">
+        <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title="Reconciled" />
         <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
@@ -228,6 +231,20 @@ export default function Transactions() {
     }
   };
 
+  const toggleReconciled = async (row) => {
+    try {
+      if (row._type === 'expense') {
+        await entities.Expense.update(row.id, { reconciled: !row.reconciled });
+        setExpenses((prev) => prev.map((e) => (e.id === row.id ? { ...e, reconciled: !e.reconciled } : e)));
+      } else {
+        await entities.Income.update(row.id, { reconciled: !row.reconciled });
+        setIncomes((prev) => prev.map((i) => (i.id === row.id ? { ...i, reconciled: !i.reconciled } : i)));
+      }
+    } catch (err) {
+      toast({ title: 'Could not update', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const confirmDelete = async () => {
     const target = deleteTarget;
     setDeleteTarget(null);
@@ -332,9 +349,16 @@ export default function Transactions() {
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
               onCopy={() => copyRow(row)}
               onDelete={() => setDeleteTarget(row)}
+              onToggleReconciled={() => toggleReconciled(row)}
             />
           ) : (
-            <IncomeRow key={row.id} i={row} onCopy={() => copyRow(row)} onDelete={() => setDeleteTarget(row)} />
+            <IncomeRow
+              key={row.id}
+              i={row}
+              onCopy={() => copyRow(row)}
+              onDelete={() => setDeleteTarget(row)}
+              onToggleReconciled={() => toggleReconciled(row)}
+            />
           )
         )}
       </div>

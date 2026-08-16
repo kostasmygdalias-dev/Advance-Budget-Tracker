@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
-import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, format } from 'date-fns';
+import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -68,6 +69,39 @@ function cycleProgress(t) {
   const pct = totalMs > 0 ? Math.min(100, (elapsedMs / totalMs) * 100) : 0;
   const daysLeft = Math.max(0, Math.ceil((cycleEnd - today) / 86400000));
   return { pct, daysLeft };
+}
+
+// Net cash-flow forecast from active templates — simulates each one forward
+// from its next occurrence rather than just multiplying by a rate, so an
+// annual charge (e.g. one €60 renewal) shows up as a single spike in the
+// month it actually lands, not smoothed into every month.
+function forecastRecurring(templates, defaultCurrency) {
+  const relevant = templates.filter((t) => t.active && (t.currency || defaultCurrency) === defaultCurrency);
+  const today = new Date();
+  const in30 = addDays(today, 30);
+  const in365 = addDays(today, 365);
+  const monthly = Array.from({ length: 12 }, (_, i) => ({ label: format(addMonths(today, i), 'MMM'), total: 0 }));
+  let next30 = 0;
+  let next365 = 0;
+  const excludedCurrencies = new Set(
+    templates.filter((t) => t.active && (t.currency || defaultCurrency) !== defaultCurrency).map((t) => t.currency)
+  );
+
+  relevant.forEach((t) => {
+    const signed = t.type === 'income' ? t.amount : -t.amount;
+    let d = parseLocalDate(t.next_due_date);
+    let iterations = 0;
+    while (d <= in365 && iterations < 400) {
+      if (d <= in30) next30 += signed;
+      next365 += signed;
+      const idx = differenceInCalendarMonths(d, today);
+      if (idx >= 0 && idx < 12) monthly[idx].total += signed;
+      d = advanceDate(format(d, 'yyyy-MM-dd'), t.frequency, t.custom_interval_days);
+      iterations++;
+    }
+  });
+
+  return { next30, next365, monthlyAvg: next365 / 12, monthly, excludedCount: excludedCurrencies.size };
 }
 
 export default function Recurring() {
@@ -215,6 +249,9 @@ export default function Recurring() {
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
 
+  const forecast = forecastRecurring(templates, defaultCurrency);
+  const hasActive = templates.some((t) => t.active);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -235,6 +272,55 @@ export default function Recurring() {
 
       {templates.length === 0 && (
         <p className="text-sm text-muted-foreground">No recurring templates yet.</p>
+      )}
+
+      {hasActive && (
+        <Card className="p-5">
+          <p className="text-sm font-medium mb-4">Forecast</p>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Next 30 days</p>
+              <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.next30 >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                {forecast.next30 >= 0 ? '+' : ''}{fmt(forecast.next30, defaultCurrency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Monthly average</p>
+              <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.monthlyAvg >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                {forecast.monthlyAvg >= 0 ? '+' : ''}{fmt(forecast.monthlyAvg, defaultCurrency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Next 12 months</p>
+              <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.next365 >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                {forecast.next365 >= 0 ? '+' : ''}{fmt(forecast.next365, defaultCurrency)}
+              </p>
+            </div>
+          </div>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={forecast.monthly} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                <Tooltip
+                  formatter={(v) => fmt(v, defaultCurrency)}
+                  cursor={{ fill: 'hsl(var(--muted))' }}
+                  contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
+                />
+                <Bar dataKey="total" radius={[4, 4, 4, 4]}>
+                  {forecast.monthly.map((m, i) => (
+                    <Cell key={i} fill={m.total >= 0 ? '#10b981' : '#ef4444'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {forecast.excludedCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Showing {defaultCurrency} only — templates in other currencies aren&apos;t included in this forecast.
+            </p>
+          )}
+        </Card>
       )}
 
       <div className="space-y-2">

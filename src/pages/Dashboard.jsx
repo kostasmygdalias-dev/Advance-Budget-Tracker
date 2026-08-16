@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { startOfWeek, endOfWeek } from 'date-fns';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,6 +20,11 @@ import PageSkeleton from '@/components/PageSkeleton';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
+
+function parseLocalDateDash(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
 
 // Which budget overages we've already toasted about, per calendar month — so
 // the alert fires once per overage, not on every single page visit. Keeps
@@ -142,18 +148,38 @@ export default function Dashboard() {
     .sort((a, b) => b.value - a.value);
 
   const budget = settings?.monthly_budget_total;
-  const budgetPct = budget > 0 ? Math.min(100, (currentExpenseTotal / budget) * 100) : 0;
+  const budgetPeriod = settings?.budget_period || 'monthly';
+  const now = new Date();
+  const periodStart = budgetPeriod === 'weekly' ? startOfWeek(now, { weekStartsOn: 1 }) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = budgetPeriod === 'weekly'
+    ? endOfWeek(now, { weekStartsOn: 1 })
+    : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const periodKey = budgetPeriod === 'weekly' ? periodStart.toISOString().slice(0, 10) : thisMonth;
 
-  // Toasts once per budget that goes over, per month — not on every load.
+  // Amortized expenses spread a purchase across months via getMonthlyContribution
+  // — that's a monthly-granularity concept, so weekly mode only counts plain
+  // single expenses whose paid_date actually falls in the current week.
+  const budgetPeriodExpenseTotal = budgetPeriod === 'weekly'
+    ? expenses.reduce((s, e) => {
+        if ((e.currency || 'EUR') !== currency || e.expense_type === 'amortized' || !e.paid_date) return s;
+        const d = parseLocalDateDash(e.paid_date);
+        return d >= periodStart && d <= periodEnd ? s + (e.amount || 0) : s;
+      }, 0)
+    : currentExpenseTotal;
+
+  const budgetPct = budget > 0 ? Math.min(100, (budgetPeriodExpenseTotal / budget) * 100) : 0;
+  const periodProgressPct = Math.min(100, Math.max(0, ((now - periodStart) / (periodEnd - periodStart)) * 100));
+
+  // Toasts once per budget that goes over, per period — not on every load.
   useEffect(() => {
     if (!settings || loading) return;
-    const alerted = getAlertedSet(thisMonth);
+    const alerted = getAlertedSet(periodKey);
     const newlyOver = [];
     const messages = [];
 
-    if (budget > 0 && currentExpenseTotal >= budget && !alerted.has('total')) {
+    if (budget > 0 && budgetPeriodExpenseTotal >= budget && !alerted.has('total')) {
       newlyOver.push('total');
-      messages.push(`You've reached your monthly budget of ${fmt(budget, currency)}.`);
+      messages.push(`You've reached your ${budgetPeriod} budget of ${fmt(budget, currency)}.`);
     }
 
     Object.entries(settings.budget_per_category || {}).forEach(([catId, catBudget]) => {
@@ -171,10 +197,10 @@ export default function Dashboard() {
         description: messages.join(' '),
         variant: 'destructive',
       });
-      markAlerted(thisMonth, newlyOver);
+      markAlerted(periodKey, newlyOver);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, loading, currentExpenseTotal, budget, thisMonth, currency]);
+  }, [settings, loading, budgetPeriodExpenseTotal, budget, periodKey, currency]);
 
   if (loading) return <PageSkeleton rows={4} />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
@@ -240,13 +266,13 @@ export default function Dashboard() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
           <Card className="p-5">
-            <p className="text-sm text-muted-foreground">Monthly budget</p>
+            <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? 'Weekly' : 'Monthly'} budget</p>
             <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
               {budget ? fmt(budget, currency) : '—'}
             </p>
             {budget > 0 && (
               <div className="mt-3">
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div className="relative h-2 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
@@ -254,8 +280,13 @@ export default function Dashboard() {
                       background: budgetPct >= 100 ? '#ef4444' : '#0f172a',
                     }}
                   />
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-foreground/40"
+                    style={{ left: `${periodProgressPct}%` }}
+                    title="Today"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used</p>
+                <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used · {periodProgressPct.toFixed(0)}% through the {budgetPeriod === 'weekly' ? 'week' : 'month'}</p>
               </div>
             )}
           </Card>

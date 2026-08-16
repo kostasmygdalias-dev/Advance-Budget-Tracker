@@ -29,11 +29,13 @@ const sheetsFetch = (path, init) => authedFetch(`https://sheets.googleapis.com/v
 const driveFetch = (path, init) => authedFetch(`https://www.googleapis.com/drive/v3${path}`, init);
 
 const SCHEMAS = {
-  Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date'],
-  Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date'],
+  Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date', 'reconciled'],
+  Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
   RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source'],
-  Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date'],
+  Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period'],
+  Debts: ['id', 'person', 'direction', 'total_amount', 'paid_amount', 'currency', 'start_date', 'due_date', 'notes', 'created_date'],
+  Goals: ['id', 'name', 'icon', 'target_amount', 'saved_amount', 'currency', 'deadline', 'created_date'],
 };
 
 let spreadsheetIdPromise = null;
@@ -207,14 +209,15 @@ const Expense = makeStore(
     e.id, e.description || '', e.amount ?? 0, e.currency || 'EUR', e.paid_date || '',
     e.category_id || '', e.payment_method || 'card', e.notes || '', JSON.stringify(e.tags || []),
     e.receipt_file_url || '', e.expense_type || 'single', e.period_value ?? '', e.period_unit || '',
-    JSON.stringify(e.amortization_schedule || []), e.created_date || new Date().toISOString(),
+    JSON.stringify(e.amortization_schedule || []), e.created_date || new Date().toISOString(), e.reconciled === true,
   ],
-  ([id, description, amount, currency, paid_date, category_id, payment_method, notes, tags, receipt_file_url, expense_type, period_value, period_unit, amortization_schedule, created_date]) => ({
+  ([id, description, amount, currency, paid_date, category_id, payment_method, notes, tags, receipt_file_url, expense_type, period_value, period_unit, amortization_schedule, created_date, reconciled]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', paid_date: paid_date || '',
     category_id: category_id || null, payment_method: payment_method || 'card', notes: notes || null,
     tags: tags ? JSON.parse(tags) : [], receipt_file_url: receipt_file_url || null, expense_type: expense_type || 'single',
     period_value: period_value !== '' && period_value != null ? Number(period_value) : null, period_unit: period_unit || null,
     amortization_schedule: amortization_schedule ? JSON.parse(amortization_schedule) : [], created_date: created_date || '',
+    reconciled: reconciled === true || reconciled === 'TRUE',
   }),
 );
 
@@ -244,11 +247,12 @@ const RecurringTemplate = makeStore(
 
 const Settings = makeStore(
   'Settings',
-  (s) => [s.id, s.default_currency || 'EUR', s.monthly_budget_total ?? '', JSON.stringify(s.budget_per_category || {}), s.created_date || new Date().toISOString()],
-  ([id, default_currency, monthly_budget_total, budget_per_category, created_date]) => ({
+  (s) => [s.id, s.default_currency || 'EUR', s.monthly_budget_total ?? '', JSON.stringify(s.budget_per_category || {}), s.created_date || new Date().toISOString(), s.budget_period || 'monthly'],
+  ([id, default_currency, monthly_budget_total, budget_per_category, created_date, budget_period]) => ({
     id, default_currency: default_currency || 'EUR',
     monthly_budget_total: monthly_budget_total !== '' && monthly_budget_total != null ? Number(monthly_budget_total) : null,
     budget_per_category: budget_per_category ? JSON.parse(budget_per_category) : {}, created_date: created_date || '',
+    budget_period: budget_period || 'monthly',
   }),
 );
 
@@ -256,15 +260,43 @@ const Income = makeStore(
   'Incomes',
   (i) => [
     i.id, i.description || '', i.amount ?? 0, i.currency || 'EUR', i.received_date || '',
-    i.source || 'other', i.notes || '', JSON.stringify(i.tags || []), i.created_date || new Date().toISOString(),
+    i.source || 'other', i.notes || '', JSON.stringify(i.tags || []), i.created_date || new Date().toISOString(), i.reconciled === true,
   ],
-  ([id, description, amount, currency, received_date, source, notes, tags, created_date]) => ({
+  ([id, description, amount, currency, received_date, source, notes, tags, created_date, reconciled]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', received_date: received_date || '',
     source: source || 'other', notes: notes || null, tags: tags ? JSON.parse(tags) : [], created_date: created_date || '',
+    reconciled: reconciled === true || reconciled === 'TRUE',
   }),
 );
 
-export const entities = { Expense, Income, Category, RecurringTemplate, Settings };
+const Debt = makeStore(
+  'Debts',
+  (d) => [
+    d.id, d.person || '', d.direction || 'they_owe', d.total_amount ?? 0, d.paid_amount ?? 0,
+    d.currency || 'EUR', d.start_date || '', d.due_date || '', d.notes || '', d.created_date || new Date().toISOString(),
+  ],
+  ([id, person, direction, total_amount, paid_amount, currency, start_date, due_date, notes, created_date]) => ({
+    id, person: person || '', direction: direction || 'they_owe',
+    total_amount: Number(total_amount) || 0, paid_amount: Number(paid_amount) || 0,
+    currency: currency || 'EUR', start_date: start_date || '', due_date: due_date || null,
+    notes: notes || null, created_date: created_date || '',
+  }),
+);
+
+const Goal = makeStore(
+  'Goals',
+  (g) => [
+    g.id, g.name || '', g.icon || 'Target', g.target_amount ?? 0, g.saved_amount ?? 0,
+    g.currency || 'EUR', g.deadline || '', g.created_date || new Date().toISOString(),
+  ],
+  ([id, name, icon, target_amount, saved_amount, currency, deadline, created_date]) => ({
+    id, name: name || '', icon: icon || 'Target',
+    target_amount: Number(target_amount) || 0, saved_amount: Number(saved_amount) || 0,
+    currency: currency || 'EUR', deadline: deadline || null, created_date: created_date || '',
+  }),
+);
+
+export const entities = { Expense, Income, Category, RecurringTemplate, Settings, Debt, Goal };
 
 // Multipart upload to the user's Drive (drive.file scope: the app can only
 // see files it creates, not the rest of their Drive).

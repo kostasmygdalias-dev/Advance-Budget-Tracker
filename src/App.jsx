@@ -18,6 +18,7 @@ const AddEditExpense = lazy(() => import('@/pages/AddEditExpense'));
 const AddEditIncome = lazy(() => import('@/pages/AddEditIncome'));
 const Categories = lazy(() => import('@/pages/Categories'));
 const Recurring = lazy(() => import('@/pages/Recurring'));
+const Goals = lazy(() => import('@/pages/Goals'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 const Login = lazy(() => import('@/pages/Login'));
 
@@ -48,6 +49,7 @@ const AuthenticatedApp = () => {
             <Route path="/income/:id/edit" element={<AddEditIncome />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/recurring" element={<Recurring />} />
+            <Route path="/goals" element={<Goals />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Route>
