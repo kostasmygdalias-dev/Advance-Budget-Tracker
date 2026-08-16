@@ -71,6 +71,14 @@ function cycleProgress(t) {
   return { pct, daysLeft };
 }
 
+// Occurrences per year for each frequency, so any cadence can be normalized
+// to a single "costs you this much a year" figure.
+const OCCURRENCES_PER_YEAR = { daily: 365, weekly: 52, monthly: 12 };
+function annualAmount(t) {
+  const perYear = OCCURRENCES_PER_YEAR[t.frequency] ?? 365 / (t.custom_interval_days || 1);
+  return t.amount * perYear;
+}
+
 // Net cash-flow forecast from active templates — simulates each one forward
 // from its next occurrence rather than just multiplying by a rate, so an
 // annual charge (e.g. one €60 renewal) shows up as a single spike in the
@@ -346,9 +354,14 @@ export default function Recurring() {
                     {` · next ${t.next_due_date}`}
                   </p>
                 </div>
-                <span className={`font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
-                  {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
-                </span>
+                <div className="text-right">
+                  <p className={`font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
+                    {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground tabular-nums">
+                    {fmt(annualAmount(t), t.currency)}/yr
+                  </p>
+                </div>
                 <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => remove(t)}><Trash2 className="w-4 h-4" /></Button>
