@@ -32,7 +32,7 @@ function ProgressBar({ pct }) {
   );
 }
 
-function BudgetRow({ category, spent, currency, value, onChange, indent, hasChildren }) {
+function BudgetRow({ category, spent, currency, value, onChange, indent, computed }) {
   const { t } = useLanguage();
   const amount = value === '' || value == null ? null : Number(value);
   const pct = amount > 0 ? (spent / amount) * 100 : 0;
@@ -48,14 +48,18 @@ function BudgetRow({ category, spent, currency, value, onChange, indent, hasChil
           onChange={(e) => onChange(e.target.value)}
           placeholder={t('budgets.noBudget')}
           className="w-32"
+          disabled={computed}
+          title={computed ? t('budgets.sumOfSubcategories') : undefined}
         />
       </div>
+      {computed && (
+        <p className="text-xs text-muted-foreground -mt-1">{t('budgets.sumOfSubcategories')}</p>
+      )}
       {amount > 0 && (
         <div className="ml-11">
           <ProgressBar pct={pct} />
           <p className="text-xs text-muted-foreground mt-1">
             {fmt(spent, currency)} / {fmt(amount, currency)} · {t('budgets.thisMonth', { pct: pct.toFixed(0) })}
-            {hasChildren && ` · ${t('budgets.includesSubcategories')}`}
           </p>
         </div>
       )}
@@ -105,12 +109,32 @@ export default function Budgets() {
     }
   }, [settings]);
 
+  const byOrder = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  const topLevel = categories.filter((c) => !c.parent_id).sort(byOrder);
+  const childrenOf = (id) => categories.filter((c) => c.parent_id === id).sort(byOrder);
+
+  // A parent's budget is never typed in directly once it has subcategories —
+  // it's always the sum of whatever's set on them, so the two can't drift
+  // out of sync. Computed fresh from perCategory on every render (reactive
+  // to every subcategory keystroke) and re-applied at save time since the
+  // parent's own key in perCategory is never written to by updateCatBudget
+  // once it's in this state.
+  const childBudgetSum = (parentId) =>
+    childrenOf(parentId).reduce((s, sub) => s + (Number(perCategory[sub.id]) || 0), 0);
+
   const save = async () => {
     setSaving(true);
     try {
+      const payload = { ...perCategory };
+      topLevel.forEach((c) => {
+        if (childrenOf(c.id).length > 0) {
+          const sum = childBudgetSum(c.id);
+          payload[c.id] = sum > 0 ? sum : null;
+        }
+      });
       const updated = await entities.Settings.update(settings.id, {
         monthly_budget_total: totalBudget === '' ? null : parseFloat(totalBudget),
-        budget_per_category: perCategory,
+        budget_per_category: payload,
       });
       setSettings(updated);
       toast({ title: t('budgets.saved') });
@@ -157,10 +181,6 @@ export default function Budgets() {
     spentByCategory[key] = (spentByCategory[key] || 0) + contrib;
   });
 
-  const byOrder = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
-  const topLevel = categories.filter((c) => !c.parent_id).sort(byOrder);
-  const childrenOf = (id) => categories.filter((c) => c.parent_id === id).sort(byOrder);
-
   const totalAmount = totalBudget === '' ? null : Number(totalBudget);
   const totalPct = totalAmount > 0 ? (totalSpentPeriod / totalAmount) * 100 : 0;
 
@@ -205,15 +225,16 @@ export default function Budgets() {
         ) : (
           topLevel.map((c) => {
             const children = childrenOf(c.id);
+            const hasChildren = children.length > 0;
             return (
               <div key={c.id} className="space-y-5">
                 <BudgetRow
                   category={c}
                   spent={amountIncludingChildren(c.id, spentByCategory, categories)}
                   currency={currency}
-                  value={perCategory[c.id]}
+                  value={hasChildren ? (childBudgetSum(c.id) || null) : perCategory[c.id]}
                   onChange={(v) => updateCatBudget(c.id, v)}
-                  hasChildren={children.length > 0}
+                  computed={hasChildren}
                 />
                 {children.map((sub) => (
                   <BudgetRow

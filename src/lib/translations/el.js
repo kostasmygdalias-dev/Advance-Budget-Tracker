@@ -248,6 +248,7 @@ export const el = {
     noCategoriesYet: 'Δεν υπάρχουν ακόμα κατηγορίες — προσθέστε κάποιες πρώτα.',
     saved: 'Οι προϋπολογισμοί αποθηκεύτηκαν',
     includesSubcategories: 'περιλαμβάνει υποκατηγορίες',
+    sumOfSubcategories: 'Άθροισμα των υποκατηγοριών του — ορίστε εκείνες',
   },
 
   reports: {
