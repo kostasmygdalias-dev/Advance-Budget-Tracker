@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
@@ -14,9 +14,12 @@ import {
 import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, isInMonth,
 } from '@/lib/finance';
-import { INCOME_SOURCES } from '@/components/IncomeForm';
+import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
+import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+
+const INCOME_COLOR = '#10b981';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
@@ -71,6 +74,49 @@ function MonthWidget({ label, income, expenses, currency }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// The whole card is a link to Transactions — a summary widget, not a place
+// to edit from, so one click target for the row is enough.
+function RecentTransactions({ rows, catMap }) {
+  return (
+    <Link to="/transactions" className="block group">
+      <Card className="p-5 transition-colors group-hover:border-foreground/20">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium">Recent transactions</p>
+          <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((row) => {
+              const isIncome = row._type === 'income';
+              const cat = !isIncome && row.category_id ? catMap[row.category_id] : null;
+              const color = isIncome ? INCOME_COLOR : (cat?.color || '#94a3b8');
+              const Icon = isIncome ? (INCOME_SOURCE_ICONS[row.source] || INCOME_SOURCE_ICONS.other) : null;
+              return (
+                <div key={row.id} className="flex items-center gap-3">
+                  {isIncome ? (
+                    <IconAvatar icon={Icon} color={color} className="w-8 h-8" />
+                  ) : (
+                    <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} className="w-8 h-8" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{row.description}</p>
+                    <p className="text-xs text-muted-foreground">{row._date}</p>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
+                    {isIncome ? '+' : ''}{fmt(row.amount, row.currency)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </Link>
   );
 }
 
@@ -159,6 +205,13 @@ export default function Dashboard() {
   const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
   const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
   const currentNet = currentIncomeTotal - currentExpenseTotal;
+
+  const recentTransactions = [
+    ...expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date })),
+    ...incomes.map((i) => ({ ...i, _type: 'income', _date: i.received_date })),
+  ]
+    .sort((a, b) => (b._date || '').localeCompare(a._date || ''))
+    .slice(0, 5);
 
   const [lastMonth] = getRecentMonths(2);
   const lastMonthExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, lastMonth) : 0), 0);
@@ -279,6 +332,8 @@ export default function Dashboard() {
         <MonthWidget label={monthName(thisMonth)} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />
         <MonthWidget label={monthName(lastMonth)} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />
       </div>
+
+      <RecentTransactions rows={recentTransactions} catMap={catMap} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-6 md:p-8 lg:col-span-2">
