@@ -1,0 +1,25 @@
+{
+  "name": "expensetrack-billing",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-16",
+
+  // Created via: wrangler kv namespace create SUBSCRIPTIONS
+  "kv_namespaces": [
+    { "binding": "SUBSCRIPTIONS", "id": "d99709ead59f48cebb54667752dddc42" }
+  ],
+
+  "vars": {
+    // Origins allowed to call this Worker from a browser. Add your
+    // production domain here — no trailing slashes.
+    "ALLOWED_ORIGINS": "https://custom.devcoresolutions.gr,http://localhost:5173"
+  },
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  }
+
+  // Secrets (never go in this file — set with `wrangler secret put <NAME>`):
+  //   STRIPE_SECRET_KEY     — Stripe secret key (sk_live_... or sk_test_...)
+  //   STRIPE_WEBHOOK_SECRET — signing secret for the webhook endpoint (whsec_...)
+}

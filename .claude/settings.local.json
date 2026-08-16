@@ -113,7 +113,20 @@
       "Bash(curl -s \"https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/actions/runs/31837775178/jobs\")",
       "Bash(curl -sI \"https://custom.devcoresolutions.gr/assets/index-B0DQ_z99.js\")",
       "Bash(curl -s \"https://custom.devcoresolutions.gr/assets/index-B0DQ_z99.js\")",
-      "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\" -o /tmp/live_check.html)"
+      "Bash(curl -s \"https://custom.devcoresolutions.gr/?nocache=$\\(date +%s\\)\" -o /tmp/live_check.html)",
+      "Bash(mkdir -p /tmp/workers-types-latest)",
+      "Bash(npm pack *)",
+      "Bash(tar -xzf /tmp/workers-types-latest/cloudflare-workers-types-*.tgz -C /tmp/workers-types-latest)",
+      "Read(//tmp/workers-types-latest/package/**)",
+      "Bash(grep -n -B 15 \"timingSafeEqual\\(\" /tmp/workers-types-latest/package/index.d.ts | head -40)",
+      "Read(//private/tmp/workers-types-latest/package/**)",
+      "Bash(grep -n -A 10 \"timingSafeEqual\\(\" /tmp/workers-types-latest/package/index.d.ts | head -15)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(curl -s -X POST http://localhost:8787/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{\"sql\":\"SELECT name, outcome, duration_ms FROM spans WHERE parent_id IS NULL ORDER BY name DESC LIMIT 10\"}')",
+      "Bash(curl -s http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces)",
+      "Bash(curl -s \"http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces/d99709ead59f48cebb54667752dddc42/keys\")",
+      "Bash(curl -s \"http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces/d99709ead59f48cebb54667752dddc42/values/sub%3Agoogle-sub-abc\")",
+      "Bash(lsof -ti:8787 -sTCP:LISTEN)"
     ],
     "additionalDirectories": [
       "\\tmp"
