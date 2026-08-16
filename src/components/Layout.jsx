@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Target, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Target, PiggyBank, BarChart3, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useDarkMode } from '@/hooks/use-dark-mode';
@@ -18,6 +18,8 @@ const NAV = [
   { to: '/transactions', label: 'Transactions', icon: Receipt },
   { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/goals', label: 'Goals', icon: Target },
+  { to: '/budgets', label: 'Budgets', icon: PiggyBank },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -178,7 +180,7 @@ export default function Layout() {
         </div>
       </main>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex border-t bg-background">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex border-t bg-background overflow-x-auto">
         {NAV.map((item) => {
           const Icon = item.icon;
           return (
@@ -186,7 +188,7 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               className={cn(
-                'relative flex-1 flex flex-col items-center gap-1 py-2 text-[11px]',
+                'relative flex-1 shrink-0 min-w-[64px] flex flex-col items-center gap-1 py-2 text-[11px]',
                 isActive(item) ? 'text-primary' : 'text-muted-foreground'
               )}
             >
