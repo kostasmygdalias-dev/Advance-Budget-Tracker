@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/components/ui/use-toast';
 import { Plus, ChevronDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
@@ -19,8 +20,37 @@ import PageSkeleton from '@/components/PageSkeleton';
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
+// Which budget overages we've already toasted about, per calendar month — so
+// the alert fires once per overage, not on every single page visit. Keeps
+// only the last few months so this doesn't grow forever.
+const ALERT_KEY = 'expensetrack_budget_alerts_v1';
+
+function getAlertedSet(monthKey) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ALERT_KEY) || '{}');
+    return new Set(stored[monthKey] || []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markAlerted(monthKey, ids) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ALERT_KEY) || '{}');
+    const existing = new Set(stored[monthKey] || []);
+    ids.forEach((id) => existing.add(id));
+    stored[monthKey] = [...existing];
+    const months = Object.keys(stored).sort();
+    while (months.length > 3) delete stored[months.shift()];
+    localStorage.setItem(ALERT_KEY, JSON.stringify(stored));
+  } catch {
+    // localStorage unavailable (private browsing, etc.) — alerts just won't be throttled across visits.
+  }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -53,9 +83,6 @@ export default function Dashboard() {
 
   useEffect(load, []);
 
-  if (loading) return <PageSkeleton rows={4} />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
-
   const catMap = {};
   categories.forEach((c) => { catMap[c.id] = c; });
 
@@ -63,19 +90,29 @@ export default function Dashboard() {
   const thisMonth = currentMonthStr();
   const currency = settings?.default_currency || 'EUR';
 
+  // Every aggregate below is scoped to the default currency. Summing raw
+  // amounts across currencies (e.g. some expenses in EUR, some in USD)
+  // would silently produce a meaningless number — there's no conversion
+  // rate available without a paid FX API, so other-currency transactions
+  // are excluded and called out instead of blended in wrong.
   const trendData = months.map((m) => ({
     month: monthLabel(m),
-    income: incomes.reduce((s, i) => s + (isInMonth(i.received_date, m) ? i.amount || 0 : 0), 0),
-    expenses: expenses.reduce((s, e) => s + getMonthlyContribution(e, m), 0),
+    income: incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, m) ? i.amount || 0 : 0), 0),
+    expenses: expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, m) : 0), 0),
   }));
   const netTrendData = trendData.map((d) => ({ month: d.month, net: d.income - d.expenses }));
 
-  const currentExpenseTotal = expenses.reduce((s, e) => s + getMonthlyContribution(e, thisMonth), 0);
-  const currentIncomeTotal = incomes.reduce((s, i) => s + (isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
+  const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
+  const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
   const currentNet = currentIncomeTotal - currentExpenseTotal;
+
+  const otherCurrencyCount =
+    expenses.filter((e) => (e.currency || 'EUR') !== currency && getMonthlyContribution(e, thisMonth) > 0).length +
+    incomes.filter((i) => (i.currency || 'EUR') !== currency && isInMonth(i.received_date, thisMonth)).length;
 
   const byCategory = {};
   expenses.forEach((e) => {
+    if ((e.currency || 'EUR') !== currency) return;
     const contrib = getMonthlyContribution(e, thisMonth);
     if (contrib <= 0) return;
     const key = e.category_id || 'uncategorized';
@@ -91,6 +128,7 @@ export default function Dashboard() {
 
   const bySource = {};
   incomes.forEach((i) => {
+    if ((i.currency || 'EUR') !== currency) return;
     if (!isInMonth(i.received_date, thisMonth)) return;
     const key = i.source || 'other';
     bySource[key] = (bySource[key] || 0) + (i.amount || 0);
@@ -105,6 +143,41 @@ export default function Dashboard() {
 
   const budget = settings?.monthly_budget_total;
   const budgetPct = budget > 0 ? Math.min(100, (currentExpenseTotal / budget) * 100) : 0;
+
+  // Toasts once per budget that goes over, per month — not on every load.
+  useEffect(() => {
+    if (!settings || loading) return;
+    const alerted = getAlertedSet(thisMonth);
+    const newlyOver = [];
+    const messages = [];
+
+    if (budget > 0 && currentExpenseTotal >= budget && !alerted.has('total')) {
+      newlyOver.push('total');
+      messages.push(`You've reached your monthly budget of ${fmt(budget, currency)}.`);
+    }
+
+    Object.entries(settings.budget_per_category || {}).forEach(([catId, catBudget]) => {
+      if (!catBudget || catBudget <= 0) return;
+      const spent = byCategory[catId] || 0;
+      if (spent >= catBudget && !alerted.has(catId)) {
+        newlyOver.push(catId);
+        messages.push(`${catMap[catId]?.name || 'A category'} is over its ${fmt(catBudget, currency)} budget.`);
+      }
+    });
+
+    if (newlyOver.length > 0) {
+      toast({
+        title: newlyOver.length === 1 ? 'Budget exceeded' : `${newlyOver.length} budgets exceeded`,
+        description: messages.join(' '),
+        variant: 'destructive',
+      });
+      markAlerted(thisMonth, newlyOver);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, loading, currentExpenseTotal, budget, thisMonth, currency]);
+
+  if (loading) return <PageSkeleton rows={4} />;
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
   return (
     <div className="space-y-8">
@@ -158,6 +231,11 @@ export default function Dashboard() {
               <p className="text-lg font-semibold tabular-nums">{fmt(currentExpenseTotal, currency)}</p>
             </div>
           </div>
+          {otherCurrencyCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Showing {currency} only — {otherCurrencyCount} transaction{otherCurrencyCount === 1 ? '' : 's'} in other currencies this month {otherCurrencyCount === 1 ? "isn't" : "aren't"} included (amounts aren't converted). <Link to="/transactions" className="underline">View them</Link>.
+            </p>
+          )}
         </Card>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">

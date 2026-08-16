@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { useAuth } from '@/lib/AuthContext';
@@ -8,11 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, CheckCircle2, Crown, FolderTree } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
 import { openBillingPortal } from '@/lib/subscription';
+import { parseCsv } from '@/lib/csv';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
@@ -26,6 +27,9 @@ export default function Settings() {
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [importType, setImportType] = useState('expense');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const manageSubscription = async () => {
     setPortalLoading(true);
@@ -88,6 +92,56 @@ export default function Settings() {
       toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const importCsv = async (file) => {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      const currency = settings.default_currency || 'EUR';
+      let imported = 0;
+      let skipped = 0;
+
+      for (const row of rows) {
+        const date = row.date || row['transaction date'] || '';
+        const description = row.description || row.memo || row.payee || '';
+        const amount = Math.abs(parseFloat(row.amount ?? ''));
+        const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+        if (!isValidDate || !description || !amount || Number.isNaN(amount)) {
+          skipped++;
+          continue;
+        }
+        try {
+          if (importType === 'income') {
+            await entities.Income.create({
+              description, amount, currency, received_date: date, source: 'other',
+            });
+          } else {
+            const categoryName = (row.category || '').trim().toLowerCase();
+            const matched = categoryName ? categories.find((c) => c.name.toLowerCase() === categoryName) : null;
+            await entities.Expense.create({
+              description, amount, currency, paid_date: date,
+              category_id: matched?.id || null, payment_method: 'other',
+              expense_type: 'single', amortization_schedule: [],
+            });
+          }
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+
+      toast({
+        title: `Imported ${imported} transaction${imported === 1 ? '' : 's'}`,
+        description: skipped > 0 ? `${skipped} row${skipped === 1 ? '' : 's'} skipped — missing or invalid date, description, or amount.` : undefined,
+      });
+    } catch (err) {
+      toast({ title: 'Could not read file', description: err.message, variant: 'destructive' });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -199,6 +253,35 @@ export default function Settings() {
           </div>
         </Card>
       )}
+
+      <Card className="p-5 space-y-4">
+        <div>
+          <p className="text-sm font-medium">Import transactions (CSV)</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Needs <code>date</code> (YYYY-MM-DD), <code>description</code>, and <code>amount</code> columns. An
+            optional <code>category</code> column is matched by name against your existing categories.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Select value={importType} onValueChange={setImportType}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Expenses</SelectItem>
+              <SelectItem value="income">Income</SelectItem>
+            </SelectContent>
+          </Select>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); }}
+          />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <Upload className="w-4 h-4 mr-1" /> {importing ? 'Importing…' : 'Choose CSV file'}
+          </Button>
+        </div>
+      </Card>
 
       <div className="flex items-center gap-3 flex-wrap">
         <Button onClick={save} disabled={saving}>

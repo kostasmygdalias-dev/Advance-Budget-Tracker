@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
-import { addDays, addMonths, addWeeks, format } from 'date-fns';
+import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, format } from 'date-fns';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -32,15 +32,42 @@ const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
+function parseLocalDate(dateStr) {
+  const [y, m, day] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, day);
+}
+
 function advanceDate(dateStr, frequency, customDays) {
   // Parse as local calendar components, not `new Date(dateStr)` (UTC midnight),
   // which can roll a month-start date back a day for timezones west of UTC.
-  const [y, m, day] = dateStr.split('-').map(Number);
-  const d = new Date(y, m - 1, day);
+  const d = parseLocalDate(dateStr);
   if (frequency === 'daily') return addDays(d, 1);
   if (frequency === 'weekly') return addWeeks(d, 1);
   if (frequency === 'monthly') return addMonths(d, 1);
   return addDays(d, customDays || 1);
+}
+
+function regressDate(dateStr, frequency, customDays) {
+  const d = parseLocalDate(dateStr);
+  if (frequency === 'daily') return subDays(d, 1);
+  if (frequency === 'weekly') return subWeeks(d, 1);
+  if (frequency === 'monthly') return subMonths(d, 1);
+  return subDays(d, customDays || 1);
+}
+
+// How far through the current billing cycle a template is — cycle start is
+// simply one frequency-step before next_due_date (there's no separate
+// "last generated" field stored, but that's exactly what next_due_date
+// minus one period represents).
+function cycleProgress(t) {
+  const cycleEnd = parseLocalDate(t.next_due_date);
+  const cycleStart = regressDate(t.next_due_date, t.frequency, t.custom_interval_days);
+  const today = new Date();
+  const totalMs = cycleEnd - cycleStart;
+  const elapsedMs = Math.min(Math.max(today - cycleStart, 0), totalMs);
+  const pct = totalMs > 0 ? Math.min(100, (elapsedMs / totalMs) * 100) : 0;
+  const daysLeft = Math.max(0, Math.ceil((cycleEnd - today) / 86400000));
+  return { pct, daysLeft };
 }
 
 export default function Recurring() {
@@ -213,30 +240,46 @@ export default function Recurring() {
       <div className="space-y-2">
         {templates.map((t) => {
           const isIncome = t.type === 'income';
+          const { pct, daysLeft } = cycleProgress(t);
           return (
-            <Card key={t.id} className="p-4 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-medium truncate">{t.description}</p>
-                  {isIncome && (
-                    <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                      Income
-                    </span>
-                  )}
-                  {!t.active && <span className="text-xs text-muted-foreground">(paused)</span>}
+            <Card key={t.id} className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium truncate">{t.description}</p>
+                    {isIncome && (
+                      <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                        Income
+                      </span>
+                    )}
+                    {!t.active && <span className="text-xs text-muted-foreground">(paused)</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
+                    {t.frequency === 'custom_days' && ` · every ${t.custom_interval_days}d`}
+                    {` · next ${t.next_due_date}`}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
-                  {t.frequency === 'custom_days' && ` · every ${t.custom_interval_days}d`}
-                  {` · next ${t.next_due_date}`}
-                </p>
+                <span className={`font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
+                  {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
+                </span>
+                <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => remove(t)}><Trash2 className="w-4 h-4" /></Button>
               </div>
-              <span className={`font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
-                {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
-              </span>
-              <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(t)}><Trash2 className="w-4 h-4" /></Button>
+              {t.active && (
+                <div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, background: isIncome ? '#10b981' : '#0f172a' }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {daysLeft === 0 ? 'Due today' : `${isIncome ? 'Expected' : 'Renews'} in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+              )}
             </Card>
           );
         })}
