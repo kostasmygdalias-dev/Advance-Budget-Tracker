@@ -8,7 +8,13 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import { Plus, Search, ChevronDown, ChevronRight, Pencil, Trash2, Layers } from 'lucide-react';
 import { monthLabel } from '@/lib/finance';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
@@ -23,7 +29,7 @@ const PAYMENT_METHODS = [
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
-function ExpenseRow({ e, cat, isOpen, onToggle }) {
+function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
   return (
     <Card className="p-0 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
@@ -62,6 +68,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle }) {
         <Link to={`/expenses/${e.id}/edit`}>
           <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
         </Link>
+        <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
       </div>
       {e.expense_type === 'amortized' && isOpen && (e.amortization_schedule || []).length > 0 && (
         <div className="border-t bg-muted/30 p-4">
@@ -82,7 +89,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle }) {
   );
 }
 
-function IncomeRow({ i }) {
+function IncomeRow({ i, onDelete }) {
   return (
     <Card className="p-0 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
@@ -104,6 +111,7 @@ function IncomeRow({ i }) {
         <Link to={`/income/${i.id}/edit`}>
           <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
         </Link>
+        <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
       </div>
     </Card>
   );
@@ -111,6 +119,7 @@ function IncomeRow({ i }) {
 
 export default function Transactions() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialType = ['income', 'expense'].includes(searchParams.get('type')) ? searchParams.get('type') : 'all';
 
@@ -121,6 +130,7 @@ export default function Transactions() {
   const [loadError, setLoadError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [type, setType] = useState(initialType);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [filters, setFilters] = useState({
     search: '', category_id: 'all', payment_method: 'all', source: 'all', from: '', to: '',
   });
@@ -180,6 +190,21 @@ export default function Transactions() {
   }, [combined, type, filters]);
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
+
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    try {
+      if (target._type === 'expense') {
+        await entities.Expense.delete(target.id);
+      } else {
+        await entities.Income.delete(target.id);
+      }
+      load();
+    } catch (err) {
+      toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+    }
+  };
 
   if (loading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
@@ -268,12 +293,31 @@ export default function Transactions() {
               cat={row.category_id ? catMap[row.category_id] : null}
               isOpen={!!expanded[row.id]}
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
+              onDelete={() => setDeleteTarget(row)}
             />
           ) : (
-            <IncomeRow key={row.id} i={row} />
+            <IncomeRow key={row.id} i={row} onDelete={() => setDeleteTarget(row)} />
           )
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && `"${deleteTarget.description}" — ${fmt(deleteTarget.amount, deleteTarget.currency)}. `}
+              This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: 'destructive' })}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
