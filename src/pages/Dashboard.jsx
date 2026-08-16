@@ -49,7 +49,8 @@ const WIDGET_DEFS = [
   { id: 'lastMonth', label: 'Last month', span: 'half' },
   { id: 'recentTransactions', label: 'Recent transactions', span: 'full' },
   { id: 'hero', label: 'Net this month', span: 'full' },
-  { id: 'budget', label: 'Budget', span: 'half' },
+  { id: 'budget', label: 'Overall budget', span: 'half' },
+  { id: 'categoryBudgets', label: 'Category budgets', span: 'full' },
   { id: 'avgSpent', label: 'Avg spent / month', span: 'half' },
   { id: 'trend', label: 'Monthly trend', span: 'full' },
   { id: 'categoryPie', label: 'Spending by category', span: 'half' },
@@ -153,6 +154,47 @@ function RecentTransactions({ rows, catMap }) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </Card>
+    </Link>
+  );
+}
+
+// One row per category that actually has a budget set — sorted worst-first
+// (closest to or over budget) so whatever needs attention is at the top,
+// not buried below categories nowhere near their limit. Links to the full
+// Budgets page, same "whole card is the click target" pattern as the other
+// summary widgets.
+function CategoryBudgets({ rows, currency }) {
+  return (
+    <Link to="/budgets" className="block group">
+      <Card className="p-5 transition-colors group-hover:border-foreground/20">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium">Category budgets</p>
+          <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No category budgets set yet — add some on the Budgets page.</p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((r) => (
+              <div key={r.id} className="flex items-center gap-3">
+                <IconAvatar icon={(props) => <CategoryIcon name={r.icon} {...props} />} color={r.color} className="w-8 h-8" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-sm font-medium truncate">{r.name}</p>
+                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">{fmt(r.spent, currency)} / {fmt(r.budget, currency)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.min(100, r.pct)}%`, background: r.pct >= 100 ? '#ef4444' : r.color }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Card>
@@ -306,6 +348,21 @@ export default function Dashboard() {
     }))
     .sort((a, b) => b.value - a.value);
 
+  const categoryBudgetRows = Object.entries(settings?.budget_per_category || {})
+    .filter(([, amt]) => amt > 0)
+    .map(([catId, amt]) => {
+      const spent = byCategory[catId] || 0;
+      return {
+        id: catId,
+        name: catId === 'uncategorized' ? 'Uncategorized' : (catMap[catId]?.name || 'Category'),
+        icon: catMap[catId]?.icon,
+        color: catId === 'uncategorized' ? '#94a3b8' : (catMap[catId]?.color || PALETTE[0]),
+        spent, budget: amt,
+        pct: amt > 0 ? (spent / amt) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.pct - a.pct);
+
   const bySource = {};
   incomes.forEach((i) => {
     if ((i.currency || 'EUR') !== currency) return;
@@ -452,6 +509,8 @@ export default function Dashboard() {
             </Card>
           </Link>
         );
+      case 'categoryBudgets':
+        return <CategoryBudgets rows={categoryBudgetRows} currency={currency} />;
       case 'avgSpent':
         return (
           <Card className="p-5 h-full">
