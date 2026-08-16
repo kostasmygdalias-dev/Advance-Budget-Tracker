@@ -59,7 +59,7 @@ export function getUpgradeUrl(user) {
 export async function openBillingPortal() {
   const { url } = await authedFetch('/create-portal-session', {
     method: 'POST',
-    body: JSON.stringify({ returnUrl: `${window.location.origin}/settings` }),
+    body: JSON.stringify({ returnUrl: `${window.location.origin}/#/settings` }),
   });
   window.location.href = url;
 }
