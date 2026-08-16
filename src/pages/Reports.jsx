@@ -14,6 +14,7 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { amountIncludingChildren } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -145,6 +146,7 @@ export default function Reports() {
     .map(([id, total]) => ({
       id,
       name: id === 'uncategorized' ? t('transactions.uncategorized') : (catMap[id]?.name || t('common.categoryFallback')),
+      parentName: id !== 'uncategorized' && catMap[id]?.parent_id ? catMap[catMap[id].parent_id]?.name : null,
       color: id === 'uncategorized' ? '#94a3b8' : (catMap[id]?.color || PALETTE[0]),
       total,
       count: categoryCounts[id],
@@ -179,11 +181,13 @@ export default function Reports() {
     .filter(([, amt]) => amt > 0)
     .map(([catId, monthlyBudget]) => {
       const totalBudget = monthlyBudget * months.length;
-      const actual = categoryTotals[catId] || 0;
+      const actual = amountIncludingChildren(catId, categoryTotals, categories);
+      const hasChildren = categories.some((c) => c.parent_id === catId);
       return {
         id: catId,
         name: catMap[catId]?.name || t('common.categoryFallback'),
         color: catMap[catId]?.color || PALETTE[0],
+        hasChildren,
         totalBudget, actual,
         variance: actual - totalBudget,
         pct: totalBudget > 0 ? (actual / totalBudget) * 100 : 0,
@@ -325,7 +329,10 @@ export default function Reports() {
                 {categoryReport.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 text-sm">
                     <IconAvatar icon={(props) => <CategoryIcon name={catMap[d.id]?.icon} {...props} />} color={d.color} className="w-7 h-7" />
-                    <span className="flex-1 min-w-0 truncate">{d.name}</span>
+                    <span className="flex-1 min-w-0 truncate">
+                      {d.name}
+                      {d.parentName && <span className="text-muted-foreground"> · {d.parentName}</span>}
+                    </span>
                     <span className="text-xs text-muted-foreground">{d.count}×</span>
                     <span className="text-xs text-muted-foreground w-10 text-right">{d.pct.toFixed(0)}%</span>
                     <span className="tabular-nums font-medium w-20 text-right">{fmt(d.total, currency)}</span>
@@ -381,6 +388,7 @@ export default function Reports() {
                   <span className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
                     {d.name}
+                    {d.hasChildren && <span className="text-xs text-muted-foreground">({t('budgets.includesSubcategories')})</span>}
                   </span>
                   <span className="tabular-nums text-muted-foreground">
                     {fmt(d.actual, currency)} / {fmt(d.totalBudget, currency)}

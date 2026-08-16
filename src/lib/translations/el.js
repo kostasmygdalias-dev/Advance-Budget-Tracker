@@ -247,6 +247,7 @@ export const el = {
     perCategory: 'Ανά κατηγορία',
     noCategoriesYet: 'Δεν υπάρχουν ακόμα κατηγορίες — προσθέστε κάποιες πρώτα.',
     saved: 'Οι προϋπολογισμοί αποθηκεύτηκαν',
+    includesSubcategories: 'περιλαμβάνει υποκατηγορίες',
   },
 
   reports: {

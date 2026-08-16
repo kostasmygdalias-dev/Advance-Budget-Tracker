@@ -12,6 +12,7 @@ import { calculateAmortizationSchedule } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import { useLanguage } from '@/lib/i18n';
 import { CATEGORY_ICON_NAMES } from '@/lib/categoryIcons';
+import { flattenCategoryTree } from '@/lib/categoryTree';
 import AmortizationPreview from './AmortizationPreview';
 
 const getPaymentMethods = (t) => [
@@ -223,8 +224,10 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           >
             <SelectTrigger><SelectValue placeholder={t('expenseForm.categoryPlaceholder')} /></SelectTrigger>
             <SelectContent>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              {flattenCategoryTree(categories).map((c) => (
+                <SelectItem key={c.id} value={c.id} className={c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}>
+                  {c.depth > 0 ? '↳ ' : ''}{c.name}
+                </SelectItem>
               ))}
               <SelectItem value={NEW_CATEGORY_VALUE} className="text-primary font-medium">
                 <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> {t('categories.newCategory')}</span>

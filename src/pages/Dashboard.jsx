@@ -18,6 +18,7 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { amountIncludingChildren } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -348,7 +349,7 @@ export default function Dashboard() {
   const categoryBudgetRows = Object.entries(settings?.budget_per_category || {})
     .filter(([, amt]) => amt > 0)
     .map(([catId, amt]) => {
-      const spent = byCategory[catId] || 0;
+      const spent = amountIncludingChildren(catId, byCategory, categories);
       return {
         id: catId,
         name: catId === 'uncategorized' ? t('transactions.uncategorized') : (catMap[catId]?.name || t('common.categoryFallback')),
@@ -414,7 +415,7 @@ export default function Dashboard() {
 
     Object.entries(settings.budget_per_category || {}).forEach(([catId, catBudget]) => {
       if (!catBudget || catBudget <= 0) return;
-      const spent = byCategory[catId] || 0;
+      const spent = amountIncludingChildren(catId, byCategory, categories);
       if (spent >= catBudget && !alerted.has(catId)) {
         newlyOver.push(catId);
         messages.push(t('dashboard.categoryOverBudget', { category: catMap[catId]?.name || t('dashboard.aCategory'), amount: fmt(catBudget, currency) }));

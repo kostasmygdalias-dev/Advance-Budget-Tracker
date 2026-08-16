@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Save } from 'lucide-react';
 import { getMonthlyContribution, currentMonthStr } from '@/lib/finance';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { amountIncludingChildren } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -31,7 +32,7 @@ function ProgressBar({ pct }) {
   );
 }
 
-function BudgetRow({ category, spent, currency, value, onChange, indent }) {
+function BudgetRow({ category, spent, currency, value, onChange, indent, hasChildren }) {
   const { t } = useLanguage();
   const amount = value === '' || value == null ? null : Number(value);
   const pct = amount > 0 ? (spent / amount) * 100 : 0;
@@ -54,6 +55,7 @@ function BudgetRow({ category, spent, currency, value, onChange, indent }) {
           <ProgressBar pct={pct} />
           <p className="text-xs text-muted-foreground mt-1">
             {fmt(spent, currency)} / {fmt(amount, currency)} · {t('budgets.thisMonth', { pct: pct.toFixed(0) })}
+            {hasChildren && ` · ${t('budgets.includesSubcategories')}`}
           </p>
         </div>
       )}
@@ -201,28 +203,32 @@ export default function Budgets() {
         {topLevel.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('budgets.noCategoriesYet')}</p>
         ) : (
-          topLevel.map((c) => (
-            <div key={c.id} className="space-y-5">
-              <BudgetRow
-                category={c}
-                spent={spentByCategory[c.id] || 0}
-                currency={currency}
-                value={perCategory[c.id]}
-                onChange={(v) => updateCatBudget(c.id, v)}
-              />
-              {childrenOf(c.id).map((sub) => (
+          topLevel.map((c) => {
+            const children = childrenOf(c.id);
+            return (
+              <div key={c.id} className="space-y-5">
                 <BudgetRow
-                  key={sub.id}
-                  category={sub}
-                  spent={spentByCategory[sub.id] || 0}
+                  category={c}
+                  spent={amountIncludingChildren(c.id, spentByCategory, categories)}
                   currency={currency}
-                  value={perCategory[sub.id]}
-                  onChange={(v) => updateCatBudget(sub.id, v)}
-                  indent
+                  value={perCategory[c.id]}
+                  onChange={(v) => updateCatBudget(c.id, v)}
+                  hasChildren={children.length > 0}
                 />
-              ))}
-            </div>
-          ))
+                {children.map((sub) => (
+                  <BudgetRow
+                    key={sub.id}
+                    category={sub}
+                    spent={spentByCategory[sub.id] || 0}
+                    currency={currency}
+                    value={perCategory[sub.id]}
+                    onChange={(v) => updateCatBudget(sub.id, v)}
+                    indent
+                  />
+                ))}
+              </div>
+            );
+          })
         )}
       </Card>
     </div>

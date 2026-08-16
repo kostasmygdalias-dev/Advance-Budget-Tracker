@@ -247,6 +247,7 @@ export const en = {
     perCategory: 'Per category',
     noCategoriesYet: 'No categories yet — add some first.',
     saved: 'Budgets saved',
+    includesSubcategories: 'includes subcategories',
   },
 
   reports: {

@@ -19,6 +19,7 @@ import { Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Tra
 import { monthLabel, currentMonthStr } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { flattenCategoryTree } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -375,8 +376,10 @@ export default function Transactions() {
               <SelectContent>
                 <SelectItem value="all">{t('transactions.allCategories')}</SelectItem>
                 <SelectItem value="uncategorized">{t('transactions.uncategorized')}</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                {flattenCategoryTree(categories).map((c) => (
+                  <SelectItem key={c.id} value={c.id} className={c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}>
+                    {c.depth > 0 ? '↳ ' : ''}{c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
