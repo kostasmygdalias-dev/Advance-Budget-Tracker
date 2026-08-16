@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, GripVertical, Sparkles } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -15,6 +16,36 @@ import { useLanguage } from '@/lib/i18n';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const ICONS = CATEGORY_ICON_NAMES;
+
+// Clicking the category's own icon swaps it directly from a grid — no need
+// to open the full edit modal and hit Save just to change one icon.
+function IconPickerButton({ icon, color, size, onPick }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <IconAvatar icon={(props) => <CategoryIcon name={icon} {...props} />} color={color} className={size} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div className="grid grid-cols-6 gap-1 max-h-64 overflow-y-auto">
+          {ICONS.map((ic) => (
+            <button
+              key={ic}
+              type="button"
+              onClick={() => { onPick(ic); setOpen(false); }}
+              className={`flex items-center justify-center rounded-md p-2 hover:bg-muted transition-colors ${ic === icon ? 'bg-muted ring-1 ring-primary' : ''}`}
+              title={ic}
+            >
+              <CategoryIcon name={ic} className="w-4 h-4" />
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function Categories() {
   const { toast } = useToast();
@@ -64,6 +95,16 @@ export default function Categories() {
   const remove = async (c) => {
     await entities.Category.delete(c.id);
     load();
+  };
+
+  const changeIcon = async (c, icon) => {
+    setCategories((prev) => prev.map((row) => (row.id === c.id ? { ...row, icon } : row)));
+    try {
+      await entities.Category.update(c.id, { icon });
+    } catch (err) {
+      setCategories((prev) => prev.map((row) => (row.id === c.id ? { ...row, icon: c.icon } : row)));
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
+    }
   };
 
   const addDefaults = async () => {
@@ -132,14 +173,14 @@ export default function Categories() {
                         <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
                           <GripVertical className="w-4 h-4" />
                         </span>
-                        <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} />
+                        <IconPickerButton icon={c.icon} color={c.color} onPick={(ic) => changeIcon(c, ic)} />
                         <span className="font-medium flex-1">{c.name}</span>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="w-4 h-4" /></Button>
                       </Card>
                       {childrenOf(c.id).map((sub) => (
                         <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6" style={{ borderLeft: `4px solid ${sub.color || '#94a3b8'}` }}>
-                          <IconAvatar icon={(props) => <CategoryIcon name={sub.icon} {...props} />} color={sub.color} className="w-7 h-7" />
+                          <IconPickerButton icon={sub.icon} color={sub.color} size="w-7 h-7" onPick={(ic) => changeIcon(sub, ic)} />
                           <span className="text-sm flex-1">{sub.name}</span>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(sub)}><Pencil className="w-4 h-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => remove(sub)}><Trash2 className="w-4 h-4" /></Button>
