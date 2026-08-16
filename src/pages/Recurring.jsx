@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Pencil, Trash2, X, Zap, Pause, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, format } from 'date-fns';
 import { INCOME_SOURCES } from '@/components/IncomeForm';
 import LoadError from '@/components/LoadError';
@@ -52,10 +52,73 @@ export default function Recurring() {
   const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null);
 
+  // Creates the actual Expense/Income entry for a due template and advances
+  // its next_due_date — repeated in a loop so a template nobody's touched in
+  // a while catches up on every occurrence it missed, not just the latest.
+  const generateOne = async (t) => {
+    if (t.type === 'income') {
+      await entities.Income.create({
+        description: t.description,
+        amount: t.amount,
+        currency: t.currency || defaultCurrency,
+        received_date: t.next_due_date,
+        source: t.source || 'other',
+        tags: ['recurring'],
+      });
+    } else {
+      await entities.Expense.create({
+        description: t.description,
+        amount: t.amount,
+        currency: t.currency || defaultCurrency,
+        paid_date: t.next_due_date,
+        payment_method: 'card',
+        expense_type: 'single',
+        amortization_schedule: [],
+        tags: ['recurring'],
+      });
+    }
+    const next = advanceDate(t.next_due_date, t.frequency, t.custom_interval_days);
+    const next_due_date = format(next, 'yyyy-MM-dd');
+    await entities.RecurringTemplate.update(t.id, { next_due_date });
+    return next_due_date;
+  };
+
+  const catchUp = async (list) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    let generated = 0;
+    for (const t of list) {
+      if (!t.active) continue;
+      let dueDate = t.next_due_date;
+      let iterations = 0;
+      while (dueDate && dueDate <= today && iterations < 24) {
+        dueDate = await generateOne({ ...t, next_due_date: dueDate });
+        generated++;
+        iterations++;
+      }
+    }
+    return generated;
+  };
+
   const load = () => {
     setLoading(true);
     setLoadError(null);
-    entities.RecurringTemplate.list().then(setTemplates).catch(setLoadError).finally(() => setLoading(false));
+    (async () => {
+      try {
+        const list = await entities.RecurringTemplate.list();
+        const generated = await catchUp(list);
+        setTemplates(generated > 0 ? await entities.RecurringTemplate.list() : list);
+        if (generated > 0) {
+          toast({
+            title: `${generated} recurring ${generated === 1 ? 'entry' : 'entries'} added`,
+            description: 'Generated automatically for templates that came due.',
+          });
+        }
+      } catch (err) {
+        setLoadError(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   useEffect(() => {
@@ -94,13 +157,18 @@ export default function Recurring() {
       source: isIncome ? (editing.source || 'other') : null,
     };
     try {
-      if (editing.id) {
-        await entities.RecurringTemplate.update(editing.id, payload);
-      } else {
-        await entities.RecurringTemplate.create(payload);
-      }
+      const saved = editing.id
+        ? await entities.RecurringTemplate.update(editing.id, payload)
+        : await entities.RecurringTemplate.create(payload);
       setEditing(null);
+      const generated = await catchUp([saved]);
       load();
+      if (generated > 0) {
+        toast({
+          title: `${generated} recurring ${generated === 1 ? 'entry' : 'entries'} added`,
+          description: "Since the due date is today or already passed, it was added right away — you don't need to do anything else.",
+        });
+      }
     } catch (err) {
       toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
     }
@@ -116,38 +184,6 @@ export default function Recurring() {
     load();
   };
 
-  const generateNext = async (t) => {
-    try {
-      if (t.type === 'income') {
-        await entities.Income.create({
-          description: t.description,
-          amount: t.amount,
-          currency: t.currency || defaultCurrency,
-          received_date: t.next_due_date,
-          source: t.source || 'other',
-          tags: ['recurring'],
-        });
-      } else {
-        await entities.Expense.create({
-          description: t.description,
-          amount: t.amount,
-          currency: t.currency || defaultCurrency,
-          paid_date: t.next_due_date,
-          payment_method: 'card',
-          expense_type: 'single',
-          amortization_schedule: [],
-          tags: ['recurring'],
-        });
-      }
-      const next = advanceDate(t.next_due_date, t.frequency, t.custom_interval_days);
-      await entities.RecurringTemplate.update(t.id, { next_due_date: format(next, 'yyyy-MM-dd') });
-      toast({ title: 'Entry generated', description: `Next due: ${format(next, 'yyyy-MM-dd')}` });
-      load();
-    } catch (err) {
-      toast({ title: 'Could not generate', description: err.message, variant: 'destructive' });
-    }
-  };
-
   if (loading || subLoading) return <PageSkeleton />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
@@ -157,7 +193,7 @@ export default function Recurring() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Recurring</h1>
-          <p className="text-sm text-muted-foreground">Templates for expenses and income that repeat indefinitely.</p>
+          <p className="text-sm text-muted-foreground">Templates for expenses and income that repeat indefinitely — entries are added automatically as each one comes due.</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -198,9 +234,6 @@ export default function Recurring() {
               <span className={`font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
                 {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
               </span>
-              <Button variant="outline" size="sm" onClick={() => generateNext(t)} disabled={!t.active}>
-                <Zap className="w-3.5 h-3.5 mr-1" /> Generate
-              </Button>
               <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" onClick={() => remove(t)}><Trash2 className="w-4 h-4" /></Button>

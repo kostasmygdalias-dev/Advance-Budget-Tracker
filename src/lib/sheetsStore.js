@@ -45,6 +45,19 @@ async function findSpreadsheetId() {
   return data.files?.[0]?.id || null;
 }
 
+// Seeded once, only into a brand-new spreadsheet — never re-added later, so
+// a user who deletes all of them (to build their own set) stays that way.
+const DEFAULT_CATEGORIES = [
+  { name: 'Groceries', icon: 'ShoppingCart', color: '#10b981' },
+  { name: 'Housing', icon: 'Home', color: '#0f172a' },
+  { name: 'Transport', icon: 'Car', color: '#0ea5e9' },
+  { name: 'Dining Out', icon: 'Utensils', color: '#f59e0b' },
+  { name: 'Bills & Utilities', icon: 'Zap', color: '#ef4444' },
+  { name: 'Health', icon: 'Heart', color: '#8b5cf6' },
+  { name: 'Travel', icon: 'Plane', color: '#14b8a6' },
+  { name: 'Gifts', icon: 'Gift', color: '#ec4899' },
+];
+
 async function createSpreadsheet() {
   const created = await sheetsFetch('', {
     method: 'POST',
@@ -53,13 +66,17 @@ async function createSpreadsheet() {
       sheets: Object.keys(SCHEMAS).map((title) => ({ properties: { title } })),
     }),
   });
+  const spreadsheetId = created.spreadsheetId;
+  const now = new Date().toISOString();
+  // Row shape must match Category's toRow encoding below: id, name, icon, color, parent_id, sort_order, created_date.
+  const defaultCategoryRows = DEFAULT_CATEGORIES.map((c, i) => [crypto.randomUUID(), c.name, c.icon, c.color, '', i, now]);
   await Promise.all(Object.entries(SCHEMAS).map(([title, headers]) =>
-    sheetsFetch(`/${created.spreadsheetId}/values/${encodeURIComponent(title)}!A1:append?valueInputOption=RAW`, {
+    sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(title)}!A1:append?valueInputOption=RAW`, {
       method: 'POST',
-      body: JSON.stringify({ values: [headers] }),
+      body: JSON.stringify({ values: title === 'Categories' ? [headers, ...defaultCategoryRows] : [headers] }),
     }),
   ));
-  return created.spreadsheetId;
+  return spreadsheetId;
 }
 
 // Adds any sheet tab (e.g. a newly introduced collection) that's missing from

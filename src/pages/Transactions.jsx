@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Search, ChevronDown, ChevronRight, Pencil, Trash2, Layers } from 'lucide-react';
+import { Plus, Search, ChevronDown, ChevronRight, Pencil, Copy, Trash2, Layers } from 'lucide-react';
 import { monthLabel } from '@/lib/finance';
 import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
@@ -32,7 +32,15 @@ const PAYMENT_METHODS = [
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
-function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
+const pad2 = (n) => String(n).padStart(2, '0');
+// Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
+// for users behind/ahead of UTC around midnight (same approach as IncomeForm).
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
+function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete }) {
   const color = cat?.color || '#94a3b8';
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
@@ -65,6 +73,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
         <Link to={`/expenses/${e.id}/edit`}>
           <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
         </Link>
+        <Button variant="ghost" size="icon" onClick={onCopy}><Copy className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
       </div>
       {e.expense_type === 'amortized' && isOpen && (e.amortization_schedule || []).length > 0 && (
@@ -86,7 +95,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
   );
 }
 
-function IncomeRow({ i, onDelete }) {
+function IncomeRow({ i, onCopy, onDelete }) {
   const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
@@ -105,6 +114,7 @@ function IncomeRow({ i, onDelete }) {
         <Link to={`/income/${i.id}/edit`}>
           <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
         </Link>
+        <Button variant="ghost" size="icon" onClick={onCopy}><Copy className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
       </div>
     </Card>
@@ -184,6 +194,39 @@ export default function Transactions() {
   }, [combined, type, filters]);
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
+
+  const copyRow = async (row) => {
+    try {
+      if (row._type === 'expense') {
+        await entities.Expense.create({
+          description: row.description,
+          amount: row.amount,
+          currency: row.currency,
+          paid_date: todayStr(),
+          category_id: row.category_id,
+          payment_method: row.payment_method,
+          notes: row.notes,
+          tags: row.tags,
+          expense_type: 'single',
+          amortization_schedule: [],
+        });
+      } else {
+        await entities.Income.create({
+          description: row.description,
+          amount: row.amount,
+          currency: row.currency,
+          received_date: todayStr(),
+          source: row.source,
+          notes: row.notes,
+          tags: row.tags,
+        });
+      }
+      load();
+      toast({ title: 'Copied', description: `Added a new entry dated today.` });
+    } catch (err) {
+      toast({ title: 'Could not copy', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const confirmDelete = async () => {
     const target = deleteTarget;
@@ -287,10 +330,11 @@ export default function Transactions() {
               cat={row.category_id ? catMap[row.category_id] : null}
               isOpen={!!expanded[row.id]}
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
+              onCopy={() => copyRow(row)}
               onDelete={() => setDeleteTarget(row)}
             />
           ) : (
-            <IncomeRow key={row.id} i={row} onDelete={() => setDeleteTarget(row)} />
+            <IncomeRow key={row.id} i={row} onCopy={() => copyRow(row)} onDelete={() => setDeleteTarget(row)} />
           )
         )}
       </div>
