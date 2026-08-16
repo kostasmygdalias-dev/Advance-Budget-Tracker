@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { startOfWeek, endOfWeek } from 'date-fns';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
@@ -38,6 +40,38 @@ function monthName(monthStr) {
   return FULL_MONTH_NAMES[m - 1];
 }
 
+// Every widget the dashboard can show — "span: full" takes the whole row,
+// "half" shares a row with another half-width widget. This is the single
+// source of truth for both the customize panel (all of them, in order) and
+// the actual grid (only the visible ones).
+const WIDGET_DEFS = [
+  { id: 'thisMonth', label: 'This month', span: 'half' },
+  { id: 'lastMonth', label: 'Last month', span: 'half' },
+  { id: 'recentTransactions', label: 'Recent transactions', span: 'full' },
+  { id: 'hero', label: 'Net this month', span: 'full' },
+  { id: 'budget', label: 'Budget', span: 'half' },
+  { id: 'avgSpent', label: 'Avg spent / month', span: 'half' },
+  { id: 'trend', label: 'Monthly trend', span: 'full' },
+  { id: 'categoryPie', label: 'Spending by category', span: 'half' },
+  { id: 'sourcePie', label: 'Income by source', span: 'half' },
+];
+const WIDGET_IDS = WIDGET_DEFS.map((w) => w.id);
+const DEFAULT_LAYOUT = WIDGET_DEFS.map((w) => ({ id: w.id, visible: true }));
+
+// Merges a saved layout with the widget registry — drops ids that no longer
+// exist, and appends any new widgets (shipped after the user last
+// customized) as visible, so a future addition doesn't silently vanish for
+// people who've already saved a layout.
+function normalizeLayout(saved) {
+  if (!saved || !Array.isArray(saved)) return DEFAULT_LAYOUT;
+  const known = saved.filter((w) => WIDGET_IDS.includes(w.id));
+  const knownIds = new Set(known.map((w) => w.id));
+  WIDGET_DEFS.forEach((w) => {
+    if (!knownIds.has(w.id)) known.push({ id: w.id, visible: true });
+  });
+  return known;
+}
+
 // Numbers-and-a-graph only, no explanatory labels — the month name is the
 // only text. The donut is just income vs. expenses split. Clicking it goes
 // to that specific month's transactions.
@@ -50,8 +84,8 @@ function MonthWidget({ label, month, income, expenses, currency }) {
   const colors = total > 0 ? ['#10b981', '#ef4444'] : ['#e5e7eb'];
 
   return (
-    <Link to={`/transactions?month=${month}`} className="block group">
-      <Card className="p-5 transition-colors group-hover:border-foreground/20">
+    <Link to={`/transactions?month=${month}`} className="block group h-full">
+      <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
         <p className="text-sm font-medium mb-3">{label}</p>
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 shrink-0">
@@ -163,6 +197,8 @@ export default function Dashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  const [customizing, setCustomizing] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -188,6 +224,33 @@ export default function Dashboard() {
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    if (settings) setLayout(normalizeLayout(settings.dashboard_layout));
+  }, [settings]);
+
+  const persistLayout = async (next) => {
+    setLayout(next);
+    if (!settings) return;
+    try {
+      const updated = await entities.Settings.update(settings.id, { dashboard_layout: next });
+      setSettings(updated);
+    } catch (err) {
+      toast({ title: 'Could not save dashboard layout', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleWidget = (id) => {
+    persistLayout(layout.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w)));
+  };
+
+  const onDragEnd = (result) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    const next = Array.from(layout);
+    const [moved] = next.splice(result.source.index, 1);
+    next.splice(result.destination.index, 0, moved);
+    persistLayout(next);
+  };
 
   const catMap = {};
   categories.forEach((c) => { catMap[c.id] = c; });
@@ -316,74 +379,59 @@ export default function Dashboard() {
   if (loading) return <PageSkeleton rows={4} />;
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
 
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{monthLabel(thisMonth)}</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => navigate('/income/new')}>Income</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MonthWidget label={monthName(thisMonth)} month={thisMonth} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />
-        <MonthWidget label={monthName(lastMonth)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />
-      </div>
-
-      <RecentTransactions rows={recentTransactions} catMap={catMap} />
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="p-6 md:p-8 lg:col-span-2">
-          <p className="text-sm text-muted-foreground">Net this month</p>
-          <p className={`text-5xl md:text-6xl font-heading font-bold mt-2 tabular-nums ${currentNet >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-            {currentNet >= 0 ? '+' : ''}{fmt(currentNet, currency)}
-          </p>
-          <div className="h-16 mt-4 -mx-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={netTrendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="netFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Tooltip
-                  formatter={(v) => fmt(v, currency)}
-                  labelFormatter={() => ''}
-                  contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
-                />
-                <Area type="monotone" dataKey="net" stroke={currentNet >= 0 ? '#10b981' : '#ef4444'} strokeWidth={2} fill="url(#netFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex items-center gap-6 pt-4 mt-2 border-t">
-            <div>
-              <p className="text-xs text-muted-foreground">Income</p>
-              <p className="text-lg font-semibold tabular-nums text-emerald-600">+{fmt(currentIncomeTotal, currency)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Spent</p>
-              <p className="text-lg font-semibold tabular-nums">{fmt(currentExpenseTotal, currency)}</p>
-            </div>
-          </div>
-          {otherCurrencyCount > 0 && (
-            <p className="text-xs text-muted-foreground mt-3">
-              Showing {currency} only — {otherCurrencyCount} transaction{otherCurrencyCount === 1 ? '' : 's'} in other currencies this month {otherCurrencyCount === 1 ? "isn't" : "aren't"} included (amounts aren't converted). <Link to="/transactions" className="underline">View them</Link>.
+  const renderWidget = (id) => {
+    switch (id) {
+      case 'thisMonth':
+        return <MonthWidget label={monthName(thisMonth)} month={thisMonth} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />;
+      case 'lastMonth':
+        return <MonthWidget label={monthName(lastMonth)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />;
+      case 'recentTransactions':
+        return <RecentTransactions rows={recentTransactions} catMap={catMap} />;
+      case 'hero':
+        return (
+          <Card className="p-6 md:p-8">
+            <p className="text-sm text-muted-foreground">Net this month</p>
+            <p className={`text-5xl md:text-6xl font-heading font-bold mt-2 tabular-nums ${currentNet >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+              {currentNet >= 0 ? '+' : ''}{fmt(currentNet, currency)}
             </p>
-          )}
-        </Card>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-          <Card className="p-5">
+            <div className="h-16 mt-4 -mx-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={netTrendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="netFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    formatter={(v) => fmt(v, currency)}
+                    labelFormatter={() => ''}
+                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
+                  />
+                  <Area type="monotone" dataKey="net" stroke={currentNet >= 0 ? '#10b981' : '#ef4444'} strokeWidth={2} fill="url(#netFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center gap-6 pt-4 mt-2 border-t">
+              <div>
+                <p className="text-xs text-muted-foreground">Income</p>
+                <p className="text-lg font-semibold tabular-nums text-emerald-600">+{fmt(currentIncomeTotal, currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Spent</p>
+                <p className="text-lg font-semibold tabular-nums">{fmt(currentExpenseTotal, currency)}</p>
+              </div>
+            </div>
+            {otherCurrencyCount > 0 && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Showing {currency} only — {otherCurrencyCount} transaction{otherCurrencyCount === 1 ? '' : 's'} in other currencies this month {otherCurrencyCount === 1 ? "isn't" : "aren't"} included (amounts aren't converted). <Link to="/transactions" className="underline">View them</Link>.
+              </p>
+            )}
+          </Card>
+        );
+      case 'budget':
+        return (
+          <Card className="p-5 h-full">
             <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? 'Weekly' : 'Monthly'} budget</p>
             <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
               {budget ? fmt(budget, currency) : '—'}
@@ -393,121 +441,197 @@ export default function Dashboard() {
                 <div className="relative h-2 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${budgetPct}%`,
-                      background: budgetPct >= 100 ? '#ef4444' : '#0f172a',
-                    }}
+                    style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? '#ef4444' : '#0f172a' }}
                   />
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-foreground/40"
-                    style={{ left: `${periodProgressPct}%` }}
-                    title="Today"
-                  />
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40" style={{ left: `${periodProgressPct}%` }} title="Today" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used · {periodProgressPct.toFixed(0)}% through the {budgetPeriod === 'weekly' ? 'week' : 'month'}</p>
               </div>
             )}
           </Card>
-          <Card className="p-5">
+        );
+      case 'avgSpent':
+        return (
+          <Card className="p-5 h-full">
             <p className="text-sm text-muted-foreground">Avg spent / month (6mo)</p>
             <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
               {fmt(trendData.reduce((s, d) => s + d.expenses, 0) / Math.max(1, trendData.length), currency)}
             </p>
           </Card>
+        );
+      case 'trend':
+        return (
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-medium">Monthly trend — income vs expenses</p>
+              <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground underline">
+                View reports
+              </Link>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={48} />
+                  <Tooltip
+                    formatter={(v) => fmt(v, currency)}
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        );
+      case 'categoryPie':
+        return (
+          <Card className="p-5 h-full">
+            <p className="text-sm font-medium mb-4">Spending by category — {monthLabel(thisMonth)}</p>
+            {pieData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No spending recorded this month yet.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4 items-center">
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                        {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v) => fmt(v, currency)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2">
+                  {pieData.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
+                        {d.name}
+                      </span>
+                      <span className="tabular-nums font-medium">{fmt(d.value, currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      case 'sourcePie':
+        return (
+          <Card className="p-5 h-full">
+            <p className="text-sm font-medium mb-4">Income by source — {monthLabel(thisMonth)}</p>
+            {incomePieData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No income recorded this month yet.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4 items-center">
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={incomePieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                        {incomePieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v) => fmt(v, currency)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2">
+                  {incomePieData.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
+                        {d.name}
+                      </span>
+                      <span className="tabular-nums font-medium">{fmt(d.value, currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const visibleWidgets = layout.filter((w) => w.visible);
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">{monthLabel(thisMonth)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setCustomizing((c) => !c)}>
+            <LayoutGrid className="w-4 h-4 mr-1" /> Customize
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => navigate('/income/new')}>Income</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <Card className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium">Monthly trend — income vs expenses</p>
-          <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground underline">
-            View reports
-          </Link>
-        </div>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={48} />
-              <Tooltip
-                formatter={(v) => fmt(v, currency)}
-                cursor={{ fill: 'hsl(var(--muted))' }}
-                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expenses" name="Expenses" fill="#0f172a" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <p className="text-sm font-medium mb-4">Spending by category — {monthLabel(thisMonth)}</p>
-          {pieData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No spending recorded this month yet.</p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-4 items-center">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                      {pieData.map((d, i) => (
-                        <Cell key={i} fill={d.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => fmt(v, currency)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2">
-                {pieData.map((d, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
-                      {d.name}
-                    </span>
-                    <span className="tabular-nums font-medium">{fmt(d.value, currency)}</span>
-                  </div>
-                ))}
-              </div>
+      {customizing && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-medium">Customize dashboard</p>
+              <p className="text-xs text-muted-foreground">Drag to reorder, toggle to show or hide.</p>
             </div>
-          )}
+            <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>Done</Button>
+          </div>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId="dashboard-widgets">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
+                  {layout.map((w, index) => {
+                    const def = WIDGET_DEFS.find((d) => d.id === w.id);
+                    return (
+                      <Draggable key={w.id} draggableId={w.id} index={index}>
+                        {(dragProvided) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
+                          >
+                            <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
+                              <GripVertical className="w-4 h-4" />
+                            </span>
+                            <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{def?.label || w.id}</span>
+                            <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </Card>
+      )}
 
-        <Card className="p-5">
-          <p className="text-sm font-medium mb-4">Income by source — {monthLabel(thisMonth)}</p>
-          {incomePieData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No income recorded this month yet.</p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-4 items-center">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={incomePieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                      {incomePieData.map((d, i) => (
-                        <Cell key={i} fill={d.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => fmt(v, currency)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2">
-                {incomePieData.map((d, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
-                      {d.name}
-                    </span>
-                    <span className="tabular-nums font-medium">{fmt(d.value, currency)}</span>
-                  </div>
-                ))}
-              </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {visibleWidgets.map((w) => {
+          const def = WIDGET_DEFS.find((d) => d.id === w.id);
+          return (
+            <div key={w.id} className={def?.span === 'full' ? 'sm:col-span-2' : ''}>
+              {renderWidget(w.id)}
             </div>
-          )}
-        </Card>
+          );
+        })}
       </div>
     </div>
   );

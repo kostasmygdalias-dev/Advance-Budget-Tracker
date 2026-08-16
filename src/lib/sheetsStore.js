@@ -33,7 +33,7 @@ const SCHEMAS = {
   Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
   RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source'],
-  Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period'],
+  Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period', 'dashboard_layout'],
   Debts: ['id', 'person', 'direction', 'total_amount', 'paid_amount', 'currency', 'start_date', 'due_date', 'notes', 'created_date'],
   Goals: ['id', 'name', 'icon', 'target_amount', 'saved_amount', 'currency', 'deadline', 'created_date'],
 };
@@ -247,12 +247,17 @@ const RecurringTemplate = makeStore(
 
 const Settings = makeStore(
   'Settings',
-  (s) => [s.id, s.default_currency || 'EUR', s.monthly_budget_total ?? '', JSON.stringify(s.budget_per_category || {}), s.created_date || new Date().toISOString(), s.budget_period || 'monthly'],
-  ([id, default_currency, monthly_budget_total, budget_per_category, created_date, budget_period]) => ({
+  (s) => [
+    s.id, s.default_currency || 'EUR', s.monthly_budget_total ?? '', JSON.stringify(s.budget_per_category || {}),
+    s.created_date || new Date().toISOString(), s.budget_period || 'monthly',
+    s.dashboard_layout ? JSON.stringify(s.dashboard_layout) : '',
+  ],
+  ([id, default_currency, monthly_budget_total, budget_per_category, created_date, budget_period, dashboard_layout]) => ({
     id, default_currency: default_currency || 'EUR',
     monthly_budget_total: monthly_budget_total !== '' && monthly_budget_total != null ? Number(monthly_budget_total) : null,
     budget_per_category: budget_per_category ? JSON.parse(budget_per_category) : {}, created_date: created_date || '',
     budget_period: budget_period || 'monthly',
+    dashboard_layout: dashboard_layout ? JSON.parse(dashboard_layout) : null,
   }),
 );
 
