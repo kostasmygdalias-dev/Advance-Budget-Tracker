@@ -10,9 +10,10 @@ import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-const ICONS = ['ShoppingCart', 'Car', 'Home', 'Utensils', 'Plane', 'Heart', 'GraduationCap', 'Briefcase', 'Gift', 'Zap'];
+const ICONS = CATEGORY_ICON_NAMES;
 
 export default function Categories() {
   const { toast } = useToast();
@@ -102,18 +103,18 @@ export default function Categories() {
                 <Draggable key={c.id} draggableId={c.id} index={index}>
                   {(dragProvided) => (
                     <div className="space-y-1" ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                      <Card className="p-3 flex items-center gap-3">
+                      <Card className="p-3 flex items-center gap-3" style={{ borderLeft: `4px solid ${c.color || '#94a3b8'}` }}>
                         <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
                           <GripVertical className="w-4 h-4" />
                         </span>
-                        <span className="w-4 h-4 rounded-full" style={{ background: c.color }} />
+                        <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} />
                         <span className="font-medium flex-1">{c.name}</span>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="w-4 h-4" /></Button>
                       </Card>
                       {childrenOf(c.id).map((sub) => (
-                        <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6">
-                          <span className="w-3 h-3 rounded-full" style={{ background: sub.color }} />
+                        <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6" style={{ borderLeft: `4px solid ${sub.color || '#94a3b8'}` }}>
+                          <IconAvatar icon={(props) => <CategoryIcon name={sub.icon} {...props} />} color={sub.color} className="w-7 h-7" />
                           <span className="text-sm flex-1">{sub.name}</span>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(sub)}><Pencil className="w-4 h-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => remove(sub)}><Trash2 className="w-4 h-4" /></Button>
@@ -173,7 +174,11 @@ export default function Categories() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ICONS.map((ic) => (
-                      <SelectItem key={ic} value={ic}>{ic}</SelectItem>
+                      <SelectItem key={ic} value={ic}>
+                        <span className="flex items-center gap-2">
+                          <CategoryIcon name={ic} className="w-4 h-4" /> {ic}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

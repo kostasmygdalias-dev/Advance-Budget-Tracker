@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Wallet, Laptop, Briefcase, TrendingUp, Gift, RotateCcw, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,16 @@ export const INCOME_SOURCES = [
   { value: 'refund', label: 'Refund' },
   { value: 'other', label: 'Other' },
 ];
+
+export const INCOME_SOURCE_ICONS = {
+  salary: Wallet,
+  freelance: Laptop,
+  business: Briefcase,
+  investment: TrendingUp,
+  gift: Gift,
+  refund: RotateCcw,
+  other: CircleDollarSign,
+};
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 const pad2 = (n) => String(n).padStart(2, '0');

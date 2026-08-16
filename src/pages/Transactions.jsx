@@ -16,9 +16,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Search, ChevronDown, ChevronRight, Pencil, Trash2, Layers } from 'lucide-react';
 import { monthLabel } from '@/lib/finance';
-import { INCOME_SOURCES } from '@/components/IncomeForm';
+import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
+import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+
+const INCOME_COLOR = '#10b981';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -30,8 +33,9 @@ const PAYMENT_METHODS = [
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
+  const color = cat?.color || '#94a3b8';
   return (
-    <Card className="p-0 overflow-hidden">
+    <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
         <button onClick={onToggle} className="text-muted-foreground">
           {e.expense_type === 'amortized' ? (
@@ -40,6 +44,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
             <span className="w-4" />
           )}
         </button>
+        <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-medium truncate">{e.description}</p>
@@ -48,17 +53,9 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
                 <Layers className="w-3 h-3" /> Amortized
               </Badge>
             )}
-            {cat && (
-              <span
-                className="inline-flex items-center text-xs px-2 py-0.5 rounded-full"
-                style={{ background: (cat.color || '#94a3b8') + '22', color: cat.color || '#475569' }}
-              >
-                {cat.name}
-              </span>
-            )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {e.paid_date} · {PAYMENT_METHODS.find((m) => m.value === e.payment_method)?.label || e.payment_method}
+            {cat ? `${cat.name} · ` : ''}{e.paid_date} · {PAYMENT_METHODS.find((m) => m.value === e.payment_method)?.label || e.payment_method}
             {(e.tags || []).length > 0 && ` · ${e.tags.join(', ')}`}
           </p>
         </div>
@@ -90,18 +87,15 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onDelete }) {
 }
 
 function IncomeRow({ i, onDelete }) {
+  const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
-    <Card className="p-0 overflow-hidden">
+    <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
       <div className="flex items-center gap-3 p-4">
+        <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-medium truncate">{i.description}</p>
-            <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-              {INCOME_SOURCES.find((s) => s.value === i.source)?.label || i.source}
-            </span>
-          </div>
+          <p className="font-medium truncate">{i.description}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {i.received_date}
+            {INCOME_SOURCES.find((s) => s.value === i.source)?.label || i.source} · {i.received_date}
             {(i.tags || []).length > 0 && ` · ${i.tags.join(', ')}`}
           </p>
         </div>

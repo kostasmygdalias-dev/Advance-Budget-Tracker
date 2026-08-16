@@ -1,13 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useDarkMode } from '@/hooks/use-dark-mode';
 import { openBillingPortal } from '@/lib/subscription';
 import { useToast } from '@/components/ui/use-toast';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import CommandPalette from '@/components/CommandPalette';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -30,8 +33,9 @@ function PlanBadge({ isPro }) {
   );
 }
 
-function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, children }) {
+function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onOpenPalette, children }) {
   const { toast } = useToast();
+  const [isDark, toggleDark] = useDarkMode();
 
   const manageSubscription = async () => {
     try {
@@ -66,6 +70,14 @@ function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, chi
           </>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onOpenPalette} className="md:hidden">
+          <Search className="w-4 h-4 mr-2" /> Quick search
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); toggleDark(); }}>
+          {isDark ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+          {isDark ? 'Light mode' : 'Dark mode'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>
           <LogOut className="w-4 h-4 mr-2" /> Log out
         </DropdownMenuItem>
@@ -81,6 +93,18 @@ export default function Layout() {
   const { active: subActive, configured: billingConfigured, loading: subLoading, upgradeUrl } = useSubscription();
   const isPro = billingConfigured && subActive;
   const showProBadge = billingConfigured && !subActive;
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -93,7 +117,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background">
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col border-r bg-sidebar">
-        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout}>
+        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
           <button className="flex items-center gap-2 px-6 h-16 border-b w-full hover:bg-sidebar-accent/40 transition-colors">
             <Wallet className="w-5 h-5 text-primary shrink-0" />
             <span className="font-heading font-semibold tracking-tight flex-1 text-left truncate">ExpenseTrack</span>
@@ -125,10 +149,19 @@ export default function Layout() {
             );
           })}
         </nav>
+        <div className="p-3 border-t">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 w-full rounded-md text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent/60 border border-dashed border-sidebar-border"
+          >
+            <Search className="w-3.5 h-3.5" /> Quick search
+            <kbd className="ml-auto text-[10px] font-mono text-sidebar-foreground/40">⌘K</kbd>
+          </button>
+        </div>
       </aside>
 
       <header className="md:hidden sticky top-0 z-30 flex items-center px-4 h-14 border-b bg-background/95 backdrop-blur">
-        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout}>
+        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
           <button className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-primary" />
             <span className="font-heading font-semibold">ExpenseTrack</span>
@@ -165,6 +198,8 @@ export default function Layout() {
           );
         })}
       </nav>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }
