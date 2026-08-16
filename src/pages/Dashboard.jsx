@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, ChevronDown } from 'lucide-react';
+import { Plus, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
@@ -24,6 +24,54 @@ const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 function parseLocalDateDash(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
+}
+
+const FULL_MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+function monthName(monthStr) {
+  const [, m] = monthStr.split('-').map(Number);
+  return FULL_MONTH_NAMES[m - 1];
+}
+
+// Numbers-and-a-graph only, no explanatory labels — the month name is the
+// only text. The donut is just income vs. expenses split.
+function MonthWidget({ label, income, expenses, currency }) {
+  const net = income - expenses;
+  const total = income + expenses;
+  const data = total > 0
+    ? [{ name: 'income', value: income }, { name: 'expenses', value: expenses }]
+    : [{ name: 'empty', value: 1 }];
+  const colors = total > 0 ? ['#10b981', '#ef4444'] : ['#e5e7eb'];
+
+  return (
+    <Card className="p-5">
+      <p className="text-sm font-medium mb-3">{label}</p>
+      <div className="flex items-center gap-5">
+        <div className="w-20 h-20 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} dataKey="value" innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} paddingAngle={total > 0 ? 3 : 0}>
+                {data.map((d, i) => <Cell key={i} fill={colors[i]} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="space-y-1.5">
+          <p className="flex items-center gap-1.5 text-emerald-600 font-semibold tabular-nums">
+            <ArrowUp className="w-3.5 h-3.5" /> {fmt(income, currency)}
+          </p>
+          <p className="flex items-center gap-1.5 text-destructive font-semibold tabular-nums">
+            <ArrowDown className="w-3.5 h-3.5" /> {fmt(expenses, currency)}
+          </p>
+          <p className={`font-semibold tabular-nums pt-1.5 border-t ${net >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+            {net >= 0 ? '+' : ''}{fmt(net, currency)}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 // Which budget overages we've already toasted about, per calendar month — so
@@ -111,6 +159,10 @@ export default function Dashboard() {
   const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
   const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
   const currentNet = currentIncomeTotal - currentExpenseTotal;
+
+  const [lastMonth] = getRecentMonths(2);
+  const lastMonthExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, lastMonth) : 0), 0);
+  const lastMonthIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, lastMonth) ? i.amount || 0 : 0), 0);
 
   const otherCurrencyCount =
     expenses.filter((e) => (e.currency || 'EUR') !== currency && getMonthlyContribution(e, thisMonth) > 0).length +
@@ -221,6 +273,11 @@ export default function Dashboard() {
             <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <MonthWidget label={monthName(thisMonth)} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />
+        <MonthWidget label={monthName(lastMonth)} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
