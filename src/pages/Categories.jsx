@@ -11,12 +11,14 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { useLanguage } from '@/lib/i18n';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const ICONS = CATEGORY_ICON_NAMES;
 
 export default function Categories() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -54,7 +56,7 @@ export default function Categories() {
       setEditing(null);
       load();
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -87,12 +89,12 @@ export default function Categories() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-heading font-semibold tracking-tight">Categories</h1>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> Add</Button>
+        <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('categories.title')}</h1>
+        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> {t('common.add')}</Button>
       </div>
 
       {topLevel.length === 0 && (
-        <p className="text-sm text-muted-foreground">No categories yet. Create your first one.</p>
+        <p className="text-sm text-muted-foreground">{t('categories.noneYet')}</p>
       )}
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -134,20 +136,20 @@ export default function Categories() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="font-heading font-semibold">{editing.id ? 'Edit category' : 'New category'}</h2>
+              <h2 className="font-heading font-semibold">{editing.id ? t('categories.editCategory') : t('categories.newCategory')}</h2>
               <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="cat-name">Name</Label>
+                <Label htmlFor="cat-name">{t('categories.name')}</Label>
                 <Input id="cat-name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus />
               </div>
               <div className="space-y-2">
-                <Label>Parent (optional)</Label>
+                <Label>{t('categories.parentOptional')}</Label>
                 <Select value={editing.parent_id} onValueChange={(v) => setEditing({ ...editing, parent_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="None (top level)" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('categories.noneTopLevel')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">None (top level)</SelectItem>
+                    <SelectItem value="__none__">{t('categories.noneTopLevel')}</SelectItem>
                     {topLevel.filter((c) => c.id !== editing.id).map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
@@ -155,7 +157,7 @@ export default function Categories() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Color</Label>
+                <Label>{t('categories.color')}</Label>
                 <div className="flex flex-wrap gap-2">
                   {COLORS.map((col) => (
                     <button
@@ -169,7 +171,7 @@ export default function Categories() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Icon</Label>
+                <Label>{t('categories.icon')}</Label>
                 <Select value={editing.icon} onValueChange={(v) => setEditing({ ...editing, icon: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -183,7 +185,7 @@ export default function Categories() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full">Save</Button>
+              <Button type="submit" className="w-full">{t('common.save')}</Button>
             </form>
           </Card>
         </div>

@@ -8,20 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { calculateAmortizationSchedule } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
+import { useLanguage } from '@/lib/i18n';
 import AmortizationPreview from './AmortizationPreview';
 
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Card' },
-  { value: 'bank_transfer', label: 'Bank transfer' },
-  { value: 'other', label: 'Other' },
+const getPaymentMethods = (t) => [
+  { value: 'cash', label: t('common.paymentMethod.cash') },
+  { value: 'card', label: t('common.paymentMethod.card') },
+  { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },
+  { value: 'other', label: t('common.paymentMethod.other') },
 ];
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
-const UNITS = [
-  { value: 'day', label: 'days' },
-  { value: 'week', label: 'weeks' },
-  { value: 'month', label: 'months' },
-  { value: 'year', label: 'years' },
+const getUnits = (t) => [
+  { value: 'day', label: t('expenseForm.units.day') },
+  { value: 'week', label: t('expenseForm.units.week') },
+  { value: 'month', label: t('expenseForm.units.month') },
+  { value: 'year', label: t('expenseForm.units.year') },
 ];
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -34,6 +35,9 @@ const todayStr = () => {
 
 export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const PAYMENT_METHODS = getPaymentMethods(t);
+  const UNITS = getUnits(t);
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
@@ -116,10 +120,10 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
       } else {
         await entities.Expense.create(payload);
       }
-      toast({ title: initialExpense ? 'Expense updated' : 'Expense added' });
+      toast({ title: initialExpense ? t('expenseForm.expenseUpdated') : t('expenseForm.expenseAdded') });
       onSaved?.();
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -128,18 +132,18 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description">{t('common.description')}</Label>
         <Input
           id="description"
           value={form.description}
           onChange={(e) => set('description', e.target.value)}
-          placeholder="e.g. Car insurance"
+          placeholder={t('expenseForm.descriptionPlaceholder')}
         />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="space-y-2 col-span-2 sm:col-span-1">
-          <Label htmlFor="amount">Amount</Label>
+          <Label htmlFor="amount">{t('common.amount')}</Label>
           <Input
             id="amount"
             type="number"
@@ -151,7 +155,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           />
         </div>
         <div className="space-y-2">
-          <Label>Currency</Label>
+          <Label>{t('common.currency')}</Label>
           <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -162,7 +166,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="paid_date">Paid date</Label>
+          <Label htmlFor="paid_date">{t('expenseForm.paidDate')}</Label>
           <Input
             id="paid_date"
             type="date"
@@ -174,9 +178,9 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Category</Label>
+          <Label>{t('common.category')}</Label>
           <Select value={form.category_id} onValueChange={(v) => set('category_id', v)}>
-            <SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t('expenseForm.categoryPlaceholder')} /></SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
@@ -185,7 +189,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Payment method</Label>
+          <Label>{t('expenseForm.paymentMethod')}</Label>
           <Select value={form.payment_method} onValueChange={(v) => set('payment_method', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -198,28 +202,28 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="tags">Tags</Label>
+        <Label htmlFor="tags">{t('common.tags')}</Label>
         <Input
           id="tags"
           value={form.tags}
           onChange={(e) => set('tags', e.target.value)}
-          placeholder="comma, separated, tags"
+          placeholder={t('common.tagsPlaceholder')}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
+        <Label htmlFor="notes">{t('common.notes')}</Label>
         <Textarea
           id="notes"
           value={form.notes}
           onChange={(e) => set('notes', e.target.value)}
           rows={2}
-          placeholder="Optional notes"
+          placeholder={t('common.optionalNotes')}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="receipt">Receipt (optional)</Label>
+        <Label htmlFor="receipt">{t('expenseForm.receiptOptional')}</Label>
         <Input
           id="receipt"
           type="file"
@@ -231,8 +235,8 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
       <div className="rounded-xl border p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium">This is a prepaid expense that covers a period</p>
-            <p className="text-xs text-muted-foreground">Spread the cost evenly across the period it covers.</p>
+            <p className="text-sm font-medium">{t('expenseForm.amortizedTitle')}</p>
+            <p className="text-xs text-muted-foreground">{t('expenseForm.amortizedSubtitle')}</p>
           </div>
           <Switch
             checked={isAmortized}
@@ -244,7 +248,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="period_value">Period value</Label>
+                <Label htmlFor="period_value">{t('expenseForm.periodValue')}</Label>
                 <Input
                   id="period_value"
                   type="number"
@@ -252,11 +256,11 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
                   min="0"
                   value={form.period_value}
                   onChange={(e) => set('period_value', e.target.value)}
-                  placeholder="e.g. 1.5"
+                  placeholder={t('expenseForm.periodValuePlaceholder')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Period unit</Label>
+                <Label>{t('expenseForm.periodUnit')}</Label>
                 <Select value={form.period_unit} onValueChange={(v) => set('period_unit', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -282,10 +286,10 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
 
       <div className="flex gap-3 pt-1">
         <Button type="submit" disabled={!canSave || saving}>
-          {saving ? 'Saving…' : initialExpense ? 'Save changes' : 'Add expense'}
+          {saving ? t('common.saving') : initialExpense ? t('expenseForm.saveChanges') : t('expenseForm.addExpense')}
         </Button>
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={onCancel}>{t('common.cancel')}</Button>
         )}
       </div>
     </form>

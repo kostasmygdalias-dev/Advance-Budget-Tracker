@@ -14,12 +14,13 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, isInMonth,
+  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth,
 } from '@/lib/finance';
-import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
+import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 const INCOME_COLOR = '#10b981';
 
@@ -31,29 +32,21 @@ function parseLocalDateDash(dateStr) {
   return new Date(y, m - 1, d);
 }
 
-const FULL_MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-function monthName(monthStr) {
-  const [, m] = monthStr.split('-').map(Number);
-  return FULL_MONTH_NAMES[m - 1];
-}
-
 // Every widget the dashboard can show — "span: full" takes the whole row,
 // "half" shares a row with another half-width widget. This is the single
 // source of truth for both the customize panel (all of them, in order) and
-// the actual grid (only the visible ones).
+// the actual grid (only the visible ones). Labels come from
+// t('dashboard.widgets.<id>') wherever they're displayed.
 const WIDGET_DEFS = [
-  { id: 'thisMonth', label: 'This month', span: 'half' },
-  { id: 'lastMonth', label: 'Last month', span: 'half' },
-  { id: 'recentTransactions', label: 'Recent transactions', span: 'full' },
-  { id: 'budget', label: 'Overall budget', span: 'half' },
-  { id: 'categoryBudgets', label: 'Category budgets', span: 'full' },
-  { id: 'avgSpent', label: 'Avg spent / month', span: 'half' },
-  { id: 'trend', label: 'Monthly trend', span: 'full' },
-  { id: 'categoryPie', label: 'Spending by category', span: 'half' },
-  { id: 'sourcePie', label: 'Income by source', span: 'half' },
+  { id: 'thisMonth', span: 'half' },
+  { id: 'lastMonth', span: 'half' },
+  { id: 'recentTransactions', span: 'full' },
+  { id: 'budget', span: 'half' },
+  { id: 'categoryBudgets', span: 'full' },
+  { id: 'avgSpent', span: 'half' },
+  { id: 'trend', span: 'full' },
+  { id: 'categoryPie', span: 'half' },
+  { id: 'sourcePie', span: 'half' },
 ];
 const WIDGET_IDS = WIDGET_DEFS.map((w) => w.id);
 const DEFAULT_LAYOUT = WIDGET_DEFS.map((w) => ({ id: w.id, visible: true }));
@@ -117,6 +110,7 @@ function MonthWidget({ label, month, income, expenses, currency }) {
 // The whole card is a link to Transactions — a summary widget, not a place
 // to edit from, so one click target for the row is enough.
 function RecentTransactions({ rows, catMap }) {
+  const { t } = useLanguage();
   // month=all: this list isn't scoped to the current month, so the newest
   // entry shown here could be from last month — the default current-month
   // view on Transactions could otherwise hide exactly what was just clicked.
@@ -124,11 +118,11 @@ function RecentTransactions({ rows, catMap }) {
     <Link to="/transactions?month=all" className="block group">
       <Card className="p-5 transition-colors group-hover:border-foreground/20">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium">Recent transactions</p>
+          <p className="text-sm font-medium">{t('dashboard.widgets.recentTransactions')}</p>
           <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </div>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+          <p className="text-sm text-muted-foreground">{t('dashboard.nothingRecordedYet')}</p>
         ) : (
           <div className="space-y-3">
             {rows.map((row) => {
@@ -166,15 +160,16 @@ function RecentTransactions({ rows, catMap }) {
 // Budgets page, same "whole card is the click target" pattern as the other
 // summary widgets.
 function CategoryBudgets({ rows, currency }) {
+  const { t } = useLanguage();
   return (
     <Link to="/budgets" className="block group">
       <Card className="p-5 transition-colors group-hover:border-foreground/20">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium">Category budgets</p>
+          <p className="text-sm font-medium">{t('dashboard.widgets.categoryBudgets')}</p>
           <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </div>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No category budgets set yet — add some on the Budgets page.</p>
+          <p className="text-sm text-muted-foreground">{t('dashboard.noCategoryBudgetsYet')}</p>
         ) : (
           <div className="space-y-3">
             {rows.map((r) => (
@@ -236,6 +231,8 @@ function markAlerted(monthKey, ids) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, lang } = useLanguage();
+  const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -281,7 +278,7 @@ export default function Dashboard() {
       const updated = await entities.Settings.update(settings.id, { dashboard_layout: next });
       setSettings(updated);
     } catch (err) {
-      toast({ title: 'Could not save dashboard layout', description: err.message, variant: 'destructive' });
+      toast({ title: t('dashboard.couldNotSaveLayout'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -310,7 +307,7 @@ export default function Dashboard() {
   // rate available without a paid FX API, so other-currency transactions
   // are excluded and called out instead of blended in wrong.
   const trendData = months.map((m) => ({
-    month: monthLabel(m),
+    month: monthLabel(m, lang),
     income: incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, m) ? i.amount || 0 : 0), 0),
     expenses: expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, m) : 0), 0),
   }));
@@ -342,7 +339,7 @@ export default function Dashboard() {
   });
   const pieData = Object.entries(byCategory)
     .map(([id, value]) => ({
-      name: id === 'uncategorized' ? 'Uncategorized' : (catMap[id]?.name || 'Category'),
+      name: id === 'uncategorized' ? t('transactions.uncategorized') : (catMap[id]?.name || t('common.categoryFallback')),
       value: Math.round(value * 100) / 100,
       color: id === 'uncategorized' ? '#94a3b8' : (catMap[id]?.color || PALETTE[0]),
     }))
@@ -354,7 +351,7 @@ export default function Dashboard() {
       const spent = byCategory[catId] || 0;
       return {
         id: catId,
-        name: catId === 'uncategorized' ? 'Uncategorized' : (catMap[catId]?.name || 'Category'),
+        name: catId === 'uncategorized' ? t('transactions.uncategorized') : (catMap[catId]?.name || t('common.categoryFallback')),
         icon: catMap[catId]?.icon,
         color: catId === 'uncategorized' ? '#94a3b8' : (catMap[catId]?.color || PALETTE[0]),
         spent, budget: amt,
@@ -372,7 +369,7 @@ export default function Dashboard() {
   });
   const incomePieData = Object.entries(bySource)
     .map(([source, value], idx) => ({
-      name: INCOME_SOURCES.find((s) => s.value === source)?.label || source,
+      name: incomeSources.find((s) => s.value === source)?.label || source,
       value: Math.round(value * 100) / 100,
       color: PALETTE[idx % PALETTE.length],
     }))
@@ -410,7 +407,9 @@ export default function Dashboard() {
 
     if (budget > 0 && budgetPeriodExpenseTotal >= budget && !alerted.has('total')) {
       newlyOver.push('total');
-      messages.push(`You've reached your ${budgetPeriod} budget of ${fmt(budget, currency)}.`);
+      messages.push(budgetPeriod === 'weekly'
+        ? t('dashboard.reachedBudgetWeekly', { amount: fmt(budget, currency) })
+        : t('dashboard.reachedBudgetMonthly', { amount: fmt(budget, currency) }));
     }
 
     Object.entries(settings.budget_per_category || {}).forEach(([catId, catBudget]) => {
@@ -418,13 +417,13 @@ export default function Dashboard() {
       const spent = byCategory[catId] || 0;
       if (spent >= catBudget && !alerted.has(catId)) {
         newlyOver.push(catId);
-        messages.push(`${catMap[catId]?.name || 'A category'} is over its ${fmt(catBudget, currency)} budget.`);
+        messages.push(t('dashboard.categoryOverBudget', { category: catMap[catId]?.name || t('dashboard.aCategory'), amount: fmt(catBudget, currency) }));
       }
     });
 
     if (newlyOver.length > 0) {
       toast({
-        title: newlyOver.length === 1 ? 'Budget exceeded' : `${newlyOver.length} budgets exceeded`,
+        title: newlyOver.length === 1 ? t('dashboard.budgetExceededOne') : t('dashboard.budgetExceededOther', { count: newlyOver.length }),
         description: messages.join(' '),
         variant: 'destructive',
       });
@@ -439,16 +438,16 @@ export default function Dashboard() {
   const renderWidget = (id) => {
     switch (id) {
       case 'thisMonth':
-        return <MonthWidget label={monthName(thisMonth)} month={thisMonth} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />;
+        return <MonthWidget label={monthNameLong(thisMonth, lang)} month={thisMonth} income={currentIncomeTotal} expenses={currentExpenseTotal} currency={currency} />;
       case 'lastMonth':
-        return <MonthWidget label={monthName(lastMonth)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />;
+        return <MonthWidget label={monthNameLong(lastMonth, lang)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />;
       case 'recentTransactions':
         return <RecentTransactions rows={recentTransactions} catMap={catMap} />;
       case 'budget':
         return (
           <Link to="/budgets" className="block group h-full">
             <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
-              <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? 'Weekly' : 'Monthly'} budget</p>
+              <p className="text-sm text-muted-foreground">{budgetPeriod === 'weekly' ? t('dashboard.weeklyBudget') : t('dashboard.monthlyBudget')}</p>
               <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
                 {budget ? fmt(budget, currency) : '—'}
               </p>
@@ -459,9 +458,13 @@ export default function Dashboard() {
                       className="h-full rounded-full transition-all"
                       style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? '#ef4444' : '#0f172a' }}
                     />
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40" style={{ left: `${periodProgressPct}%` }} title="Today" />
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40" style={{ left: `${periodProgressPct}%` }} title={t('dashboard.today')} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{budgetPct.toFixed(0)}% used · {periodProgressPct.toFixed(0)}% through the {budgetPeriod === 'weekly' ? 'week' : 'month'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {budgetPeriod === 'weekly'
+                      ? t('dashboard.usedThroughWeek', { pct: budgetPct.toFixed(0), progress: periodProgressPct.toFixed(0) })
+                      : t('dashboard.usedThroughMonth', { pct: budgetPct.toFixed(0), progress: periodProgressPct.toFixed(0) })}
+                  </p>
                 </div>
               )}
             </Card>
@@ -472,7 +475,7 @@ export default function Dashboard() {
       case 'avgSpent':
         return (
           <Card className="p-5 h-full">
-            <p className="text-sm text-muted-foreground">Avg spent / month (6mo)</p>
+            <p className="text-sm text-muted-foreground">{t('dashboard.avgSpentPerMonth')}</p>
             <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">
               {fmt(trendData.reduce((s, d) => s + d.expenses, 0) / Math.max(1, trendData.length), currency)}
             </p>
@@ -482,9 +485,9 @@ export default function Dashboard() {
         return (
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium">Monthly trend — income vs expenses</p>
+              <p className="text-sm font-medium">{t('dashboard.monthlyTrendTitle')}</p>
               <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground underline">
-                View reports
+                {t('dashboard.viewReports')}
               </Link>
             </div>
             <div className="h-64">
@@ -498,8 +501,8 @@ export default function Dashboard() {
                     contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="income" name={t('common.income')} fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name={t('common.expense')} fill="#0f172a" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -508,9 +511,9 @@ export default function Dashboard() {
       case 'categoryPie':
         return (
           <Card className="p-5 h-full">
-            <p className="text-sm font-medium mb-4">Spending by category — {monthLabel(thisMonth)}</p>
+            <p className="text-sm font-medium mb-4">{t('dashboard.spendingByCategoryFor', { month: monthLabel(thisMonth, lang) })}</p>
             {pieData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No spending recorded this month yet.</p>
+              <p className="text-sm text-muted-foreground">{t('dashboard.noSpendingThisMonth')}</p>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4 items-center">
                 <div className="h-56">
@@ -541,9 +544,9 @@ export default function Dashboard() {
       case 'sourcePie':
         return (
           <Card className="p-5 h-full">
-            <p className="text-sm font-medium mb-4">Income by source — {monthLabel(thisMonth)}</p>
+            <p className="text-sm font-medium mb-4">{t('dashboard.incomeBySourceFor', { month: monthLabel(thisMonth, lang) })}</p>
             {incomePieData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No income recorded this month yet.</p>
+              <p className="text-sm text-muted-foreground">{t('dashboard.noIncomeThisMonth')}</p>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4 items-center">
                 <div className="h-56">
@@ -582,20 +585,20 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{monthLabel(thisMonth)}</p>
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('dashboard.title')}</h1>
+          <p className="text-sm text-muted-foreground">{monthLabel(thisMonth, lang)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setCustomizing((c) => !c)}>
-            <LayoutGrid className="w-4 h-4 mr-1" /> Customize
+            <LayoutGrid className="w-4 h-4 mr-1" /> {t('dashboard.customize')}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
+              <Button><Plus className="w-4 h-4 mr-1" /> {t('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => navigate('/income/new')}>Income</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/income/new')}>{t('common.income')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>{t('common.expense')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -606,11 +609,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 text-amber-600">
             <Tag className="w-5 h-5 shrink-0" />
             <p className="text-sm text-foreground">
-              <span className="font-medium">{uncategorizedCount} uncategorized expenses</span> this month — fill them in for more accurate budgets and reports.
+              <span className="font-medium">{t('dashboard.uncategorizedBanner', { count: uncategorizedCount })}</span> {t('dashboard.uncategorizedBannerSuffix')}
             </p>
           </div>
           <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
-            <Button variant="outline" size="sm">Review now</Button>
+            <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
           </Link>
         </Card>
       )}
@@ -619,35 +622,32 @@ export default function Dashboard() {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-medium">Customize dashboard</p>
-              <p className="text-xs text-muted-foreground">Drag to reorder, toggle to show or hide.</p>
+              <p className="text-sm font-medium">{t('dashboard.customizePanelTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.customizePanelSubtitle')}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>Done</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>{t('dashboard.done')}</Button>
           </div>
           <DragDropContext onDragEnd={onDragEnd}>
             <Droppable droppableId="dashboard-widgets">
               {(provided) => (
                 <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
-                  {layout.map((w, index) => {
-                    const def = WIDGET_DEFS.find((d) => d.id === w.id);
-                    return (
-                      <Draggable key={w.id} draggableId={w.id} index={index}>
-                        {(dragProvided) => (
-                          <div
-                            ref={dragProvided.innerRef}
-                            {...dragProvided.draggableProps}
-                            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
-                          >
-                            <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
-                              <GripVertical className="w-4 h-4" />
-                            </span>
-                            <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{def?.label || w.id}</span>
-                            <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
-                          </div>
-                        )}
-                      </Draggable>
-                    );
-                  })}
+                  {layout.map((w, index) => (
+                    <Draggable key={w.id} draggableId={w.id} index={index}>
+                      {(dragProvided) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
+                        >
+                          <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
+                            <GripVertical className="w-4 h-4" />
+                          </span>
+                          <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{t(`dashboard.widgets.${w.id}`)}</span>
+                          <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
                   {provided.placeholder}
                 </div>
               )}

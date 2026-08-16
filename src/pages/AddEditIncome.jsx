@@ -6,10 +6,12 @@ import IncomeForm from '@/components/IncomeForm';
 import { entities } from '@/lib/sheetsStore';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 export default function AddEditIncome() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [income, setIncome] = useState(null);
   const [loading, setLoading] = useState(!!id);
   const [loadError, setLoadError] = useState(null);
@@ -36,7 +38,7 @@ export default function AddEditIncome() {
           <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
-          {id ? 'Edit income' : 'Add income'}
+          {id ? t('addEditIncome.editTitle') : t('addEditIncome.addTitle')}
         </h1>
       </div>
       <IncomeForm

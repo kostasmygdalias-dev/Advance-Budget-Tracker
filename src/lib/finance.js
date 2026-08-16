@@ -92,10 +92,20 @@ export function getRecentMonths(n, ref = new Date()) {
   return months;
 }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export function monthLabel(monthStr) {
+// Intl handles the actual month-name translation (Aug 2026 / Αυγ 2026) — no
+// hardcoded name list to keep in sync with the translation dictionaries.
+export function monthLabel(monthStr, lang = 'en') {
   const [y, m] = monthStr.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
+  return new Intl.DateTimeFormat(lang, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1));
+}
+
+export function monthNameLong(monthStr, lang = 'en') {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Intl.DateTimeFormat(lang, { month: 'long' }).format(new Date(y, m - 1, 1));
+}
+
+export function shortMonth(date, lang = 'en') {
+  return new Intl.DateTimeFormat(lang, { month: 'short' }).format(date);
 }
 
 export function currentMonthStr(ref = new Date()) {

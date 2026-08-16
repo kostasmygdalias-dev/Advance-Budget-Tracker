@@ -11,22 +11,24 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { INCOME_SOURCES } from '@/components/IncomeForm';
+import { getIncomeSources } from '@/components/IncomeForm';
+import { shortMonth } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useLanguage } from '@/lib/i18n';
 
-const FREQUENCIES = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'custom_days', label: 'Custom (days)' },
+const getFrequencies = (t) => [
+  { value: 'daily', label: t('recurring.frequency.daily') },
+  { value: 'weekly', label: t('recurring.frequency.weekly') },
+  { value: 'monthly', label: t('recurring.frequency.monthly') },
+  { value: 'custom_days', label: t('recurring.frequency.custom_days') },
 ];
 
-const TYPES = [
-  { value: 'expense', label: 'Expense' },
-  { value: 'income', label: 'Income' },
+const getTypes = (t) => [
+  { value: 'expense', label: t('common.expense') },
+  { value: 'income', label: t('common.income') },
 ];
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
@@ -83,12 +85,12 @@ function annualAmount(t) {
 // from its next occurrence rather than just multiplying by a rate, so an
 // annual charge (e.g. one €60 renewal) shows up as a single spike in the
 // month it actually lands, not smoothed into every month.
-function forecastRecurring(templates, defaultCurrency) {
+function forecastRecurring(templates, defaultCurrency, lang) {
   const relevant = templates.filter((t) => t.active && (t.currency || defaultCurrency) === defaultCurrency);
   const today = new Date();
   const in30 = addDays(today, 30);
   const in365 = addDays(today, 365);
-  const monthly = Array.from({ length: 12 }, (_, i) => ({ label: format(addMonths(today, i), 'MMM'), total: 0 }));
+  const monthly = Array.from({ length: 12 }, (_, i) => ({ label: shortMonth(addMonths(today, i), lang), total: 0 }));
   let next30 = 0;
   let next365 = 0;
   const excludedCurrencies = new Set(
@@ -114,6 +116,12 @@ function forecastRecurring(templates, defaultCurrency) {
 
 export default function Recurring() {
   const { toast } = useToast();
+  // Aliased to `tr` — this file already uses `t` everywhere as the loop/param
+  // name for a recurring template, so `t()` for translation would collide.
+  const { t: tr, lang } = useLanguage();
+  const FREQUENCIES = getFrequencies(tr);
+  const TYPES = getTypes(tr);
+  const incomeSources = getIncomeSources(tr);
   const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
   const [templates, setTemplates] = useState([]);
   const [defaultCurrency, setDefaultCurrency] = useState('EUR');
@@ -178,8 +186,8 @@ export default function Recurring() {
         setTemplates(generated > 0 ? await entities.RecurringTemplate.list() : list);
         if (generated > 0) {
           toast({
-            title: `${generated} recurring ${generated === 1 ? 'entry' : 'entries'} added`,
-            description: 'Generated automatically for templates that came due.',
+            title: generated === 1 ? tr('recurring.entriesAddedOne', { count: generated }) : tr('recurring.entriesAddedOther', { count: generated }),
+            description: tr('recurring.generatedAutomatically'),
           });
         }
       } catch (err) {
@@ -234,12 +242,12 @@ export default function Recurring() {
       load();
       if (generated > 0) {
         toast({
-          title: `${generated} recurring ${generated === 1 ? 'entry' : 'entries'} added`,
-          description: "Since the due date is today or already passed, it was added right away — you don't need to do anything else.",
+          title: generated === 1 ? tr('recurring.entriesAddedOne', { count: generated }) : tr('recurring.entriesAddedOther', { count: generated }),
+          description: tr('recurring.addedRightAway'),
         });
       }
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: tr('common.couldNotSave'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -257,49 +265,49 @@ export default function Recurring() {
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
 
-  const forecast = forecastRecurring(templates, defaultCurrency);
+  const forecast = forecastRecurring(templates, defaultCurrency, lang);
   const hasActive = templates.some((t) => t.active);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">Recurring</h1>
-          <p className="text-sm text-muted-foreground">Templates for expenses and income that repeat indefinitely — entries are added automatically as each one comes due.</p>
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">{tr('recurring.title')}</h1>
+          <p className="text-sm text-muted-foreground">{tr('recurring.subtitle')}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
+            <Button><Plus className="w-4 h-4 mr-1" /> {tr('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => openNew('income')}>Income</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => openNew('expense')}>Expense</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openNew('income')}>{tr('common.income')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openNew('expense')}>{tr('common.expense')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {templates.length === 0 && (
-        <p className="text-sm text-muted-foreground">No recurring templates yet.</p>
+        <p className="text-sm text-muted-foreground">{tr('recurring.noneYet')}</p>
       )}
 
       {hasActive && (
         <Card className="p-5">
-          <p className="text-sm font-medium mb-4">Forecast</p>
+          <p className="text-sm font-medium mb-4">{tr('recurring.forecast')}</p>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <p className="text-xs text-muted-foreground">Next 30 days</p>
+              <p className="text-xs text-muted-foreground">{tr('recurring.next30Days')}</p>
               <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.next30 >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                 {forecast.next30 >= 0 ? '+' : ''}{fmt(forecast.next30, defaultCurrency)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Monthly average</p>
+              <p className="text-xs text-muted-foreground">{tr('recurring.monthlyAverage')}</p>
               <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.monthlyAvg >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                 {forecast.monthlyAvg >= 0 ? '+' : ''}{fmt(forecast.monthlyAvg, defaultCurrency)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Next 12 months</p>
+              <p className="text-xs text-muted-foreground">{tr('recurring.next12Months')}</p>
               <p className={`text-xl font-heading font-semibold tabular-nums ${forecast.next365 >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                 {forecast.next365 >= 0 ? '+' : ''}{fmt(forecast.next365, defaultCurrency)}
               </p>
@@ -325,7 +333,7 @@ export default function Recurring() {
           </div>
           {forecast.excludedCount > 0 && (
             <p className="text-xs text-muted-foreground mt-2">
-              Showing {defaultCurrency} only — templates in other currencies aren&apos;t included in this forecast.
+              {tr('recurring.otherCurrenciesExcluded', { currency: defaultCurrency })}
             </p>
           )}
         </Card>
@@ -343,15 +351,15 @@ export default function Recurring() {
                     <p className="font-medium truncate">{t.description}</p>
                     {isIncome && (
                       <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                        Income
+                        {tr('recurring.incomeBadge')}
                       </span>
                     )}
-                    {!t.active && <span className="text-xs text-muted-foreground">(paused)</span>}
+                    {!t.active && <span className="text-xs text-muted-foreground">{tr('recurring.paused')}</span>}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
-                    {t.frequency === 'custom_days' && ` · every ${t.custom_interval_days}d`}
-                    {` · next ${t.next_due_date}`}
+                    {t.frequency === 'custom_days' && ` · ${tr('recurring.everyNDays', { n: t.custom_interval_days })}`}
+                    {` · ${tr('recurring.next', { date: t.next_due_date })}`}
                   </p>
                 </div>
                 <div className="text-right">
@@ -359,7 +367,7 @@ export default function Recurring() {
                     {isIncome ? '+' : ''}{fmt(t.amount, t.currency)}
                   </p>
                   <p className="text-[11px] text-muted-foreground tabular-nums">
-                    {fmt(annualAmount(t), t.currency)}/yr
+                    {fmt(annualAmount(t), t.currency)}{tr('recurring.perYear')}
                   </p>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
@@ -375,7 +383,11 @@ export default function Recurring() {
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {daysLeft === 0 ? 'Due today' : `${isIncome ? 'Expected' : 'Renews'} in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+                    {daysLeft === 0
+                      ? tr('recurring.dueToday')
+                      : isIncome
+                        ? (daysLeft === 1 ? tr('recurring.expectedInDayOne', { n: daysLeft }) : tr('recurring.expectedInDayOther', { n: daysLeft }))
+                        : (daysLeft === 1 ? tr('recurring.renewsInDayOne', { n: daysLeft }) : tr('recurring.renewsInDayOther', { n: daysLeft }))}
                   </p>
                 </div>
               )}
@@ -388,12 +400,12 @@ export default function Recurring() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="font-heading font-semibold">{editing.id ? 'Edit template' : 'New recurring template'}</h2>
+              <h2 className="font-heading font-semibold">{editing.id ? tr('recurring.editTemplate') : tr('recurring.newTemplate')}</h2>
               <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label>{tr('recurring.type')}</Label>
                 <Select value={editing.type} onValueChange={(v) => setEditing({ ...editing, type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -404,16 +416,16 @@ export default function Recurring() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="r-desc">Description</Label>
+                <Label htmlFor="r-desc">{tr('common.description')}</Label>
                 <Input id="r-desc" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} autoFocus />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="r-amount">Amount</Label>
+                  <Label htmlFor="r-amount">{tr('common.amount')}</Label>
                   <Input id="r-amount" type="number" step="0.01" value={editing.amount} onChange={(e) => setEditing({ ...editing, amount: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Currency</Label>
+                  <Label>{tr('common.currency')}</Label>
                   <Select value={editing.currency || defaultCurrency} onValueChange={(v) => setEditing({ ...editing, currency: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -426,11 +438,11 @@ export default function Recurring() {
               </div>
               {editing.type === 'income' && (
                 <div className="space-y-2">
-                  <Label>Source</Label>
+                  <Label>{tr('incomeForm.source')}</Label>
                   <Select value={editing.source} onValueChange={(v) => setEditing({ ...editing, source: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {INCOME_SOURCES.map((s) => (
+                      {incomeSources.map((s) => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -439,11 +451,11 @@ export default function Recurring() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="r-due">Next due</Label>
+                  <Label htmlFor="r-due">{tr('recurring.nextDue')}</Label>
                   <Input id="r-due" type="date" value={editing.next_due_date} onChange={(e) => setEditing({ ...editing, next_due_date: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Frequency</Label>
+                  <Label>{tr('recurring.frequencyLabel')}</Label>
                   <Select value={editing.frequency} onValueChange={(v) => setEditing({ ...editing, frequency: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -455,16 +467,16 @@ export default function Recurring() {
                 </div>
                 {editing.frequency === 'custom_days' && (
                   <div className="space-y-2">
-                    <Label htmlFor="r-custom">Every (days)</Label>
+                    <Label htmlFor="r-custom">{tr('recurring.everyDays')}</Label>
                     <Input id="r-custom" type="number" value={editing.custom_interval_days} onChange={(e) => setEditing({ ...editing, custom_interval_days: e.target.value })} />
                   </div>
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <Label htmlFor="r-active">Active</Label>
+                <Label htmlFor="r-active">{tr('recurring.active')}</Label>
                 <Switch checked={editing.active} onCheckedChange={(v) => setEditing({ ...editing, active: v })} />
               </div>
-              <Button type="submit" className="w-full">Save</Button>
+              <Button type="submit" className="w-full">{tr('common.save')}</Button>
             </form>
           </Card>
         </div>

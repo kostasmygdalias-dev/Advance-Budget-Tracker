@@ -12,10 +12,11 @@ import {
 import {
   getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths,
 } from '@/lib/finance';
-import { INCOME_SOURCES } from '@/components/IncomeForm';
+import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
@@ -50,12 +51,14 @@ function rangeContribution(e, months) {
 }
 
 const PRESETS = [
-  { label: '3mo', months: 3 },
-  { label: '6mo', months: 6 },
-  { label: '12mo', months: 12 },
+  { key: 'preset3mo', months: 3 },
+  { key: 'preset6mo', months: 6 },
+  { key: 'preset12mo', months: 12 },
 ];
 
 export default function Reports() {
+  const { t, lang } = useLanguage();
+  const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -117,7 +120,7 @@ export default function Reports() {
     const net = income - expense;
     runningNet += net;
     return {
-      month: monthLabel(m),
+      month: monthLabel(m, lang),
       income, expense, net,
       cumulative: runningNet,
       savingsRate: income > 0 ? (net / income) * 100 : 0,
@@ -141,7 +144,7 @@ export default function Reports() {
   const categoryReport = Object.entries(categoryTotals)
     .map(([id, total]) => ({
       id,
-      name: id === 'uncategorized' ? 'Uncategorized' : (catMap[id]?.name || 'Category'),
+      name: id === 'uncategorized' ? t('transactions.uncategorized') : (catMap[id]?.name || t('common.categoryFallback')),
       color: id === 'uncategorized' ? '#94a3b8' : (catMap[id]?.color || PALETTE[0]),
       total,
       count: categoryCounts[id],
@@ -162,7 +165,7 @@ export default function Reports() {
   const sourceReport = Object.entries(sourceTotals)
     .map(([source, total], idx) => ({
       source,
-      name: INCOME_SOURCES.find((s) => s.value === source)?.label || source,
+      name: incomeSources.find((s) => s.value === source)?.label || source,
       color: PALETTE[idx % PALETTE.length],
       total,
       count: sourceCounts[source],
@@ -179,7 +182,7 @@ export default function Reports() {
       const actual = categoryTotals[catId] || 0;
       return {
         id: catId,
-        name: catMap[catId]?.name || 'Category',
+        name: catMap[catId]?.name || t('common.categoryFallback'),
         color: catMap[catId]?.color || PALETTE[0],
         totalBudget, actual,
         variance: actual - totalBudget,
@@ -200,45 +203,47 @@ export default function Reports() {
     <div className="space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">Reports</h1>
-          <p className="text-sm text-muted-foreground">{monthLabel(fromMonth)} – {monthLabel(toMonth)}</p>
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('reports.title')}</h1>
+          <p className="text-sm text-muted-foreground">{monthLabel(fromMonth, lang)} – {monthLabel(toMonth, lang)}</p>
         </div>
       </div>
 
       <Card className="p-4">
         <div className="flex items-end gap-3 flex-wrap">
           <div className="space-y-1.5">
-            <Label htmlFor="from-month" className="text-xs">From</Label>
+            <Label htmlFor="from-month" className="text-xs">{t('reports.from')}</Label>
             <Input id="from-month" type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="w-40" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="to-month" className="text-xs">To</Label>
+            <Label htmlFor="to-month" className="text-xs">{t('reports.to')}</Label>
             <Input id="to-month" type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="w-40" />
           </div>
           <div className="flex gap-1.5">
             {PRESETS.map((p) => (
-              <Button key={p.label} variant="outline" size="sm" onClick={() => applyPreset(p.months)}>{p.label}</Button>
+              <Button key={p.key} variant="outline" size="sm" onClick={() => applyPreset(p.months)}>{t(`reports.${p.key}`)}</Button>
             ))}
           </div>
         </div>
         {otherCurrencyCount > 0 && (
           <p className="text-xs text-muted-foreground mt-3">
-            Showing {currency} only — {otherCurrencyCount} transaction{otherCurrencyCount === 1 ? '' : 's'} in other currencies {otherCurrencyCount === 1 ? "isn't" : "aren't"} included. <Link to="/transactions?month=all" className="underline">View them</Link>.
+            {otherCurrencyCount === 1
+              ? t('reports.otherCurrenciesNoteOne', { currency, count: otherCurrencyCount })
+              : t('reports.otherCurrenciesNoteOther', { currency, count: otherCurrencyCount })} <Link to="/transactions?month=all" className="underline">{t('reports.viewThem')}</Link>.
           </p>
         )}
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Total income</p>
+          <p className="text-sm text-muted-foreground">{t('reports.totalIncome')}</p>
           <p className="text-2xl font-heading font-semibold mt-1 tabular-nums text-emerald-600">+{fmt(totalIncome, currency)}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Total spent</p>
+          <p className="text-sm text-muted-foreground">{t('reports.totalSpent')}</p>
           <p className="text-2xl font-heading font-semibold mt-1 tabular-nums">{fmt(totalExpense, currency)}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Net</p>
+          <p className="text-sm text-muted-foreground">{t('reports.net')}</p>
           <p className={`text-2xl font-heading font-semibold mt-1 tabular-nums ${totalIncome - totalExpense >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
             {totalIncome - totalExpense >= 0 ? '+' : ''}{fmt(totalIncome - totalExpense, currency)}
           </p>
@@ -246,7 +251,7 @@ export default function Reports() {
       </div>
 
       <Card className="p-5">
-        <p className="text-sm font-medium mb-4">Income vs expenses</p>
+        <p className="text-sm font-medium mb-4">{t('reports.incomeVsExpenses')}</p>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
@@ -254,8 +259,8 @@ export default function Reports() {
               <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={48} />
               <Tooltip formatter={(v) => fmt(v, currency)} cursor={{ fill: 'hsl(var(--muted))' }} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Expenses" fill="#0f172a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name={t('common.income')} fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name={t('common.expense')} fill="#0f172a" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -263,23 +268,23 @@ export default function Reports() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <p className="text-sm font-medium mb-1">Savings rate</p>
-          <p className="text-xs text-muted-foreground mb-4">(income − expenses) ÷ income, per month</p>
+          <p className="text-sm font-medium mb-1">{t('reports.savingsRate')}</p>
+          <p className="text-xs text-muted-foreground mb-4">{t('reports.savingsRateFormula')}</p>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthly} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
                 <Tooltip formatter={(v) => `${v.toFixed(1)}%`} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                <Line type="monotone" dataKey="savingsRate" name="Savings rate" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="savingsRate" name={t('reports.savingsRate')} stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
         <Card className="p-5">
-          <p className="text-sm font-medium mb-1">Cumulative net</p>
-          <p className="text-xs text-muted-foreground mb-4">Running total of income minus expenses across the range</p>
+          <p className="text-sm font-medium mb-1">{t('reports.cumulativeNet')}</p>
+          <p className="text-xs text-muted-foreground mb-4">{t('reports.cumulativeNetSubtitle')}</p>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthly} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
@@ -292,7 +297,7 @@ export default function Reports() {
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={48} />
                 <Tooltip formatter={(v) => fmt(v, currency)} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                <Area type="monotone" dataKey="cumulative" name="Cumulative net" stroke="#0ea5e9" strokeWidth={2} fill="url(#cumFill)" />
+                <Area type="monotone" dataKey="cumulative" name={t('reports.cumulativeNet')} stroke="#0ea5e9" strokeWidth={2} fill="url(#cumFill)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -301,9 +306,9 @@ export default function Reports() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <p className="text-sm font-medium mb-4">Spending by category</p>
+          <p className="text-sm font-medium mb-4">{t('reports.spendingByCategory')}</p>
           {categoryReport.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No spending in this range.</p>
+            <p className="text-sm text-muted-foreground">{t('reports.noSpendingInRange')}</p>
           ) : (
             <>
               <div className="h-48 mb-4">
@@ -332,9 +337,9 @@ export default function Reports() {
         </Card>
 
         <Card className="p-5">
-          <p className="text-sm font-medium mb-4">Income by source</p>
+          <p className="text-sm font-medium mb-4">{t('reports.incomeBySource')}</p>
           {sourceReport.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No income in this range.</p>
+            <p className="text-sm text-muted-foreground">{t('reports.noIncomeInRange')}</p>
           ) : (
             <>
               <div className="h-48 mb-4">
@@ -364,10 +369,10 @@ export default function Reports() {
       </div>
 
       <Card className="p-5">
-        <p className="text-sm font-medium mb-1">Budget vs actual</p>
-        <p className="text-xs text-muted-foreground mb-4">Categories with a per-category budget set in Settings, totaled across the range</p>
+        <p className="text-sm font-medium mb-1">{t('reports.budgetVsActual')}</p>
+        <p className="text-xs text-muted-foreground mb-4">{t('reports.budgetVsActualSubtitle')}</p>
         {budgetReport.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No per-category budgets set yet — add some in Settings.</p>
+          <p className="text-sm text-muted-foreground">{t('reports.noBudgetsYet')}</p>
         ) : (
           <div className="space-y-3">
             {budgetReport.map((d) => (
@@ -394,9 +399,9 @@ export default function Reports() {
       </Card>
 
       <Card className="p-5">
-        <p className="text-sm font-medium mb-4">Biggest expenses</p>
+        <p className="text-sm font-medium mb-4">{t('reports.biggestExpenses')}</p>
         {biggestExpenses.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No expenses in this range.</p>
+          <p className="text-sm text-muted-foreground">{t('reports.noExpensesInRange')}</p>
         ) : (
           <div className="space-y-2">
             {biggestExpenses.map((e) => {

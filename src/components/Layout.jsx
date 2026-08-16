@@ -4,6 +4,7 @@ import { LayoutDashboard, Receipt, Repeat, Target, PiggyBank, BarChart3, Setting
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useDarkMode } from '@/hooks/use-dark-mode';
+import { useLanguage } from '@/lib/i18n';
 import { openBillingPortal } from '@/lib/subscription';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -14,17 +15,18 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import CommandPalette from '@/components/CommandPalette';
 import { cn } from '@/lib/utils';
 
-const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { to: '/transactions', label: 'Transactions', icon: Receipt },
-  { to: '/recurring', label: 'Recurring', icon: Repeat },
-  { to: '/goals', label: 'Goals', icon: Target },
-  { to: '/budgets', label: 'Budgets', icon: PiggyBank },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+const getNav = (t) => [
+  { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
+  { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
+  { to: '/recurring', label: t('nav.recurring'), icon: Repeat },
+  { to: '/goals', label: t('nav.goals'), icon: Target },
+  { to: '/budgets', label: t('nav.budgets'), icon: PiggyBank },
+  { to: '/reports', label: t('nav.reports'), icon: BarChart3 },
+  { to: '/settings', label: t('nav.settings'), icon: SettingsIcon },
 ];
 
 function PlanBadge({ isPro }) {
+  const { t } = useLanguage();
   return (
     <span
       className={cn(
@@ -32,7 +34,7 @@ function PlanBadge({ isPro }) {
         isPro ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted'
       )}
     >
-      {isPro ? 'PRO' : 'FREE'}
+      {isPro ? t('common.pro') : t('common.free')}
     </span>
   );
 }
@@ -40,6 +42,7 @@ function PlanBadge({ isPro }) {
 function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onOpenPalette, children }) {
   const { toast } = useToast();
   const [isDark, toggleDark] = useDarkMode();
+  const { t } = useLanguage();
 
   const manageSubscription = async () => {
     try {
@@ -54,7 +57,7 @@ function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onO
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel className="font-normal">
-          <p className="text-sm font-medium">{isPro ? 'Pro plan' : 'Free plan'}</p>
+          <p className="text-sm font-medium">{isPro ? t('accountMenu.proPlan') : t('accountMenu.freePlan')}</p>
           {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
         </DropdownMenuLabel>
         {billingConfigured && (
@@ -62,12 +65,12 @@ function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onO
             <DropdownMenuSeparator />
             {isPro ? (
               <DropdownMenuItem onSelect={manageSubscription}>
-                <Crown className="w-4 h-4 mr-2" /> Manage subscription
+                <Crown className="w-4 h-4 mr-2" /> {t('accountMenu.manageSubscription')}
               </DropdownMenuItem>
             ) : (
               upgradeUrl && (
                 <DropdownMenuItem onSelect={() => { window.location.href = upgradeUrl; }}>
-                  <Crown className="w-4 h-4 mr-2" /> Upgrade to Pro
+                  <Crown className="w-4 h-4 mr-2" /> {t('accountMenu.upgradeToPro')}
                 </DropdownMenuItem>
               )
             )}
@@ -75,15 +78,15 @@ function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onO
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onOpenPalette} className="md:hidden">
-          <Search className="w-4 h-4 mr-2" /> Quick search
+          <Search className="w-4 h-4 mr-2" /> {t('accountMenu.quickSearch')}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); toggleDark(); }}>
           {isDark ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
-          {isDark ? 'Light mode' : 'Dark mode'}
+          {isDark ? t('accountMenu.lightMode') : t('accountMenu.darkMode')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>
-          <LogOut className="w-4 h-4 mr-2" /> Log out
+          <LogOut className="w-4 h-4 mr-2" /> {t('accountMenu.logOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -99,6 +102,8 @@ export default function Layout() {
   const showProBadge = billingConfigured && !subActive;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const { t } = useLanguage();
+  const NAV = getNav(t);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -147,7 +152,7 @@ export default function Layout() {
                 <Icon className="w-4 h-4" /> {item.label}
                 {item.to === '/recurring' && showProBadge && (
                   <span className="ml-auto text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                    PRO
+                    {t('common.pro')}
                   </span>
                 )}
               </Link>
@@ -159,7 +164,7 @@ export default function Layout() {
             onClick={() => setPaletteOpen(true)}
             className="flex items-center gap-2 px-3 py-2 w-full rounded-md text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent/60 border border-dashed border-sidebar-border"
           >
-            <Search className="w-3.5 h-3.5" /> Quick search
+            <Search className="w-3.5 h-3.5" /> {t('accountMenu.quickSearch')}
             <kbd className="ml-auto text-[10px] font-mono text-sidebar-foreground/40">⌘K</kbd>
           </button>
         </div>
@@ -168,7 +173,7 @@ export default function Layout() {
       <header className="md:hidden sticky top-0 z-30 flex items-center gap-1 px-2 h-14 border-b bg-background/95 backdrop-blur">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
-            <button className="p-2 rounded-md hover:bg-muted transition-colors" aria-label="Open menu">
+            <button className="p-2 rounded-md hover:bg-muted transition-colors" aria-label={t('accountMenu.openMenu')}>
               <Menu className="w-5 h-5" />
             </button>
           </SheetTrigger>
@@ -196,7 +201,7 @@ export default function Layout() {
                     <Icon className="w-4 h-4" /> {item.label}
                     {item.to === '/recurring' && showProBadge && (
                       <span className="ml-auto text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                        PRO
+                        {t('common.pro')}
                       </span>
                     )}
                   </Link>

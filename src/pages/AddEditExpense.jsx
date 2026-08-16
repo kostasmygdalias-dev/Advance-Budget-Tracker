@@ -6,10 +6,12 @@ import ExpenseForm from '@/components/ExpenseForm';
 import { entities } from '@/lib/sheetsStore';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 export default function AddEditExpense() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(!!id);
   const [loadError, setLoadError] = useState(null);
@@ -39,7 +41,7 @@ export default function AddEditExpense() {
           <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
-          {id ? 'Edit expense' : 'Add expense'}
+          {id ? t('addEditExpense.editTitle') : t('addEditExpense.addTitle')}
         </h1>
       </div>
       <ExpenseForm

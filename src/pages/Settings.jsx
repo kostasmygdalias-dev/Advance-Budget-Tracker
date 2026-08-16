@@ -13,12 +13,14 @@ import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
 import { openBillingPortal } from '@/lib/subscription';
 import { parseCsv } from '@/lib/csv';
+import { useLanguage, LANGUAGES } from '@/lib/i18n';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t, lang, setLang } = useLanguage();
   const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -80,9 +82,9 @@ export default function Settings() {
         default_currency: settings.default_currency,
         budget_period: settings.budget_period || 'monthly',
       });
-      toast({ title: 'Settings saved' });
+      toast({ title: t('settings.settingsSaved') });
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -127,11 +129,11 @@ export default function Settings() {
       }
 
       toast({
-        title: `Imported ${imported} transaction${imported === 1 ? '' : 's'}`,
-        description: skipped > 0 ? `${skipped} row${skipped === 1 ? '' : 's'} skipped — missing or invalid date, description, or amount.` : undefined,
+        title: imported === 1 ? t('settings.importedTransactionsOne', { count: imported }) : t('settings.importedTransactionsOther', { count: imported }),
+        description: skipped > 0 ? (skipped === 1 ? t('settings.rowsSkippedOne', { count: skipped }) : t('settings.rowsSkippedOther', { count: skipped })) : undefined,
       });
     } catch (err) {
-      toast({ title: 'Could not read file', description: err.message, variant: 'destructive' });
+      toast({ title: t('settings.couldNotReadFile'), description: err.message, variant: 'destructive' });
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -159,17 +161,15 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-heading font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('settings.title')}</h1>
 
       <Card className="p-5 space-y-2">
         <div className="flex items-center gap-2 text-emerald-600">
           <CheckCircle2 className="w-5 h-5" />
-          <p className="text-sm font-medium">Signed in as {user?.email}</p>
+          <p className="text-sm font-medium">{t('settings.signedInAs', { email: user?.email })}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          All your data — expenses, categories, recurring templates, and these settings —
-          lives in a spreadsheet named "ExpenseTrack Data" in your own Google Drive.
-          Nobody else, including this app, keeps a separate copy.
+          {t('settings.dataNotice')}
         </p>
       </Card>
 
@@ -180,27 +180,27 @@ export default function Settings() {
               <Crown className={`w-5 h-5 ${subActive ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <p className="text-sm font-medium">{subActive ? 'Pro plan' : 'Free plan'}</p>
+              <p className="text-sm font-medium">{subActive ? t('settings.proPlan') : t('settings.freePlan')}</p>
               <p className="text-xs text-muted-foreground">
-                {subActive ? 'Recurring templates unlocked' : 'Upgrade to unlock recurring expense & income templates'}
+                {subActive ? t('settings.recurringUnlocked') : t('settings.recurringLocked')}
               </p>
             </div>
           </div>
           {subActive ? (
             <Button variant="outline" onClick={manageSubscription} disabled={portalLoading}>
-              {portalLoading ? 'Opening…' : 'Manage subscription'}
+              {portalLoading ? t('settings.opening') : t('settings.manageSubscription')}
             </Button>
           ) : (
-            upgradeUrl && <Button onClick={() => { window.location.href = upgradeUrl; }}>Upgrade to Pro</Button>
+            upgradeUrl && <Button onClick={() => { window.location.href = upgradeUrl; }}>{t('settings.upgradeToPro')}</Button>
           )}
         </Card>
       )}
 
       <Card className="p-5 space-y-4">
-        <p className="text-sm font-medium">Preferences</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p className="text-sm font-medium">{t('settings.preferences')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label>Default currency</Label>
+            <Label>{t('settings.defaultCurrency')}</Label>
             <Select value={settings.default_currency} onValueChange={(v) => update('default_currency', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -211,12 +211,23 @@ export default function Settings() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Budget period</Label>
+            <Label>{t('settings.budgetPeriod')}</Label>
             <Select value={settings.budget_period || 'monthly'} onValueChange={(v) => update('budget_period', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">{t('settings.monthly')}</SelectItem>
+                <SelectItem value="weekly">{t('settings.weekly')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('settings.language')}</Label>
+            <Select value={lang} onValueChange={setLang}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((l) => (
+                  <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -225,18 +236,17 @@ export default function Settings() {
 
       <Card className="p-5 space-y-4">
         <div>
-          <p className="text-sm font-medium">Import transactions (CSV)</p>
+          <p className="text-sm font-medium">{t('settings.importTitle')}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Needs <code>date</code> (YYYY-MM-DD), <code>description</code>, and <code>amount</code> columns. An
-            optional <code>category</code> column is matched by name against your existing categories.
+            {t('settings.importDescription')}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={importType} onValueChange={setImportType}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="expense">Expenses</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
+              <SelectItem value="expense">{t('transactions.tabExpenses')}</SelectItem>
+              <SelectItem value="income">{t('common.income')}</SelectItem>
             </SelectContent>
           </Select>
           <input
@@ -247,31 +257,31 @@ export default function Settings() {
             onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); }}
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            <Upload className="w-4 h-4 mr-1" /> {importing ? 'Importing…' : 'Choose CSV file'}
+            <Upload className="w-4 h-4 mr-1" /> {importing ? t('settings.importing') : t('settings.chooseCsvFile')}
           </Button>
         </div>
       </Card>
 
       <div className="flex items-center gap-3 flex-wrap">
         <Button onClick={save} disabled={saving}>
-          <Save className="w-4 h-4 mr-1" /> {saving ? 'Saving…' : 'Save settings'}
+          <Save className="w-4 h-4 mr-1" /> {saving ? t('common.saving') : t('settings.saveSettings')}
         </Button>
         <Button variant="outline" onClick={exportData}>
-          <Download className="w-4 h-4 mr-1" /> Export data (JSON)
+          <Download className="w-4 h-4 mr-1" /> {t('settings.exportData')}
         </Button>
         <Link to="/categories">
           <Button variant="outline">
-            <FolderTree className="w-4 h-4 mr-1" /> Manage categories
+            <FolderTree className="w-4 h-4 mr-1" /> {t('settings.manageCategories')}
           </Button>
         </Link>
         <Link to="/budgets">
           <Button variant="outline">
-            <Wallet className="w-4 h-4 mr-1" /> Manage budgets
+            <Wallet className="w-4 h-4 mr-1" /> {t('settings.manageBudgets')}
           </Button>
         </Link>
         <Link to="/reports">
           <Button variant="outline">
-            <BarChart3 className="w-4 h-4 mr-1" /> View reports
+            <BarChart3 className="w-4 h-4 mr-1" /> {t('settings.viewReports')}
           </Button>
         </Link>
       </div>

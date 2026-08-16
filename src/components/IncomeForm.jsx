@@ -7,15 +7,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { entities } from '@/lib/sheetsStore';
+import { useLanguage } from '@/lib/i18n';
 
-export const INCOME_SOURCES = [
-  { value: 'salary', label: 'Salary' },
-  { value: 'freelance', label: 'Freelance' },
-  { value: 'business', label: 'Business' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'gift', label: 'Gift' },
-  { value: 'refund', label: 'Refund' },
-  { value: 'other', label: 'Other' },
+// A function, not a static array, so every call site can translate the
+// labels with its own t() — the underlying values (stored in the
+// spreadsheet) never change with language.
+export const getIncomeSources = (t) => [
+  { value: 'salary', label: t('common.incomeSource.salary') },
+  { value: 'freelance', label: t('common.incomeSource.freelance') },
+  { value: 'business', label: t('common.incomeSource.business') },
+  { value: 'investment', label: t('common.incomeSource.investment') },
+  { value: 'gift', label: t('common.incomeSource.gift') },
+  { value: 'refund', label: t('common.incomeSource.refund') },
+  { value: 'other', label: t('common.incomeSource.other') },
 ];
 
 export const INCOME_SOURCE_ICONS = {
@@ -39,6 +43,8 @@ const todayStr = () => {
 
 export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const incomeSources = getIncomeSources(t);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     description: '',
@@ -89,10 +95,10 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
       } else {
         await entities.Income.create(payload);
       }
-      toast({ title: initialIncome ? 'Income updated' : 'Income added' });
+      toast({ title: initialIncome ? t('incomeForm.incomeUpdated') : t('incomeForm.incomeAdded') });
       onSaved?.();
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -101,18 +107,18 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description">{t('common.description')}</Label>
         <Input
           id="description"
           value={form.description}
           onChange={(e) => set('description', e.target.value)}
-          placeholder="e.g. Monthly salary"
+          placeholder={t('incomeForm.descriptionPlaceholder')}
         />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="space-y-2 col-span-2 sm:col-span-1">
-          <Label htmlFor="amount">Amount</Label>
+          <Label htmlFor="amount">{t('common.amount')}</Label>
           <Input
             id="amount"
             type="number"
@@ -124,7 +130,7 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
           />
         </div>
         <div className="space-y-2">
-          <Label>Currency</Label>
+          <Label>{t('common.currency')}</Label>
           <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -135,7 +141,7 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="received_date">Received date</Label>
+          <Label htmlFor="received_date">{t('incomeForm.receivedDate')}</Label>
           <Input
             id="received_date"
             type="date"
@@ -146,11 +152,11 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
       </div>
 
       <div className="space-y-2">
-        <Label>Source</Label>
+        <Label>{t('incomeForm.source')}</Label>
         <Select value={form.source} onValueChange={(v) => set('source', v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            {INCOME_SOURCES.map((s) => (
+            {incomeSources.map((s) => (
               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
           </SelectContent>
@@ -158,32 +164,32 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="tags">Tags</Label>
+        <Label htmlFor="tags">{t('common.tags')}</Label>
         <Input
           id="tags"
           value={form.tags}
           onChange={(e) => set('tags', e.target.value)}
-          placeholder="comma, separated, tags"
+          placeholder={t('common.tagsPlaceholder')}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
+        <Label htmlFor="notes">{t('common.notes')}</Label>
         <Textarea
           id="notes"
           value={form.notes}
           onChange={(e) => set('notes', e.target.value)}
           rows={2}
-          placeholder="Optional notes"
+          placeholder={t('common.optionalNotes')}
         />
       </div>
 
       <div className="flex gap-3 pt-1">
         <Button type="submit" disabled={!canSave || saving}>
-          {saving ? 'Saving…' : initialIncome ? 'Save changes' : 'Add income'}
+          {saving ? t('common.saving') : initialIncome ? t('incomeForm.saveChanges') : t('incomeForm.addIncome')}
         </Button>
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={onCancel}>{t('common.cancel')}</Button>
         )}
       </div>
     </form>

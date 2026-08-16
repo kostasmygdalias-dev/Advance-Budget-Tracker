@@ -5,6 +5,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { HashRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { LanguageProvider } from '@/lib/i18n';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Layout from '@/components/Layout';
@@ -67,21 +68,23 @@ const AuthenticatedApp = () => {
 function App() {
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        {/* HashRouter, not BrowserRouter: the live host serves this app
-            through nginx, which returns a bare 404 for any path other than
-            "/" (no SPA-fallback rewrite, unlike the Apache the .htaccess
-            file assumes). Hash routes (/#/settings) never leave the client,
-            so refreshing or deep-linking any route always works regardless
-            of server config. */}
-        <Router>
-          <ScrollToTop />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          {/* HashRouter, not BrowserRouter: the live host serves this app
+              through nginx, which returns a bare 404 for any path other than
+              "/" (no SPA-fallback rewrite, unlike the Apache the .htaccess
+              file assumes). Hash routes (/#/settings) never leave the client,
+              so refreshing or deep-linking any route always works regardless
+              of server config. */}
+          <Router>
+            <ScrollToTop />
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </AuthProvider>
+    </LanguageProvider>
   )
 }
 

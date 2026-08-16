@@ -17,18 +17,19 @@ import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers } from 'lucide-react';
 import { monthLabel, currentMonthStr } from '@/lib/finance';
-import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
+import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 const INCOME_COLOR = '#10b981';
 
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Card' },
-  { value: 'bank_transfer', label: 'Bank transfer' },
-  { value: 'other', label: 'Other' },
+const getPaymentMethods = (t) => [
+  { value: 'cash', label: t('common.paymentMethod.cash') },
+  { value: 'card', label: t('common.paymentMethod.card') },
+  { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },
+  { value: 'other', label: t('common.paymentMethod.other') },
 ];
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
@@ -48,11 +49,13 @@ function shiftMonth(monthStr, delta) {
 }
 
 function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
+  const { t, lang } = useLanguage();
+  const PAYMENT_METHODS = getPaymentMethods(t);
   const color = cat?.color || '#94a3b8';
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
-        <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title="Reconciled" />
+        <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
         <button onClick={onToggle} className="text-muted-foreground">
           {e.expense_type === 'amortized' ? (
             isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
@@ -66,7 +69,7 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconc
             <p className="font-medium truncate">{e.description}</p>
             {e.expense_type === 'amortized' && (
               <Badge variant="secondary" className="gap-1">
-                <Layers className="w-3 h-3" /> Amortized
+                <Layers className="w-3 h-3" /> {t('transactions.amortized')}
               </Badge>
             )}
           </div>
@@ -87,12 +90,12 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconc
       {e.expense_type === 'amortized' && isOpen && (e.amortization_schedule || []).length > 0 && (
         <div className="border-t bg-muted/30 p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-            {e.period_value} {e.period_unit}(s) · schedule
+            {t('transactions.scheduleHeading', { value: e.period_value, unit: t(`expenseForm.units.${e.period_unit}`) })}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {e.amortization_schedule.map((s) => (
               <div key={s.month} className="flex justify-between text-sm rounded bg-background border px-3 py-2">
-                <span className="text-muted-foreground">{monthLabel(s.month)}</span>
+                <span className="text-muted-foreground">{monthLabel(s.month, lang)}</span>
                 <span className="font-medium tabular-nums">{s.amount.toFixed(2)}</span>
               </div>
             ))}
@@ -104,16 +107,18 @@ function ExpenseRow({ e, cat, isOpen, onToggle, onCopy, onDelete, onToggleReconc
 }
 
 function IncomeRow({ i, onCopy, onDelete, onToggleReconciled }) {
+  const { t } = useLanguage();
+  const incomeSources = getIncomeSources(t);
   const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
       <div className="flex items-center gap-3 p-4">
-        <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title="Reconciled" />
+        <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
         <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {INCOME_SOURCES.find((s) => s.value === i.source)?.label || i.source} · {i.received_date}
+            {incomeSources.find((s) => s.value === i.source)?.label || i.source} · {i.received_date}
             {(i.tags || []).length > 0 && ` · ${i.tags.join(', ')}`}
           </p>
         </div>
@@ -133,6 +138,8 @@ function IncomeRow({ i, onCopy, onDelete, onToggleReconciled }) {
 export default function Transactions() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, lang } = useLanguage();
+  const incomeSources = getIncomeSources(t);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialType = ['income', 'expense'].includes(searchParams.get('type')) ? searchParams.get('type') : 'all';
   // Month-first browsing by default (like the month navigator this mirrors) —
@@ -261,9 +268,9 @@ export default function Transactions() {
         });
       }
       load();
-      toast({ title: 'Copied', description: `Added a new entry dated today.` });
+      toast({ title: t('transactions.copied'), description: t('transactions.copiedDescription') });
     } catch (err) {
-      toast({ title: 'Could not copy', description: err.message, variant: 'destructive' });
+      toast({ title: t('transactions.couldNotCopy'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -277,7 +284,7 @@ export default function Transactions() {
         setIncomes((prev) => prev.map((i) => (i.id === row.id ? { ...i, reconciled: !i.reconciled } : i)));
       }
     } catch (err) {
-      toast({ title: 'Could not update', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotUpdate'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -292,7 +299,7 @@ export default function Transactions() {
       }
       load();
     } catch (err) {
-      toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotDelete'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -302,14 +309,14 @@ export default function Transactions() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-heading font-semibold tracking-tight">Transactions</h1>
+        <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('transactions.title')}</h1>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-1" /> Add <ChevronDown className="w-4 h-4 ml-1" /></Button>
+            <Button><Plus className="w-4 h-4 mr-1" /> {t('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => navigate('/income/new')}>Income</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>Expense</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/income/new')}>{t('common.income')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>{t('common.expense')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -321,7 +328,7 @@ export default function Transactions() {
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <button onClick={() => changeMonth(null)} className="text-sm font-medium hover:underline">
-              {monthLabel(month)}
+              {monthLabel(month, lang)}
             </button>
             <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))}>
               <ChevronRight className="w-4 h-4" />
@@ -331,7 +338,7 @@ export default function Transactions() {
           <>
             <span />
             <button onClick={() => changeMonth(currentMonthStr())} className="text-sm font-medium hover:underline">
-              All time
+              {t('transactions.allTime')}
             </button>
             <span />
           </>
@@ -341,9 +348,9 @@ export default function Transactions() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Tabs value={type} onValueChange={changeType}>
           <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="income">Income</TabsTrigger>
-            <TabsTrigger value="expense">Expenses</TabsTrigger>
+            <TabsTrigger value="all">{t('transactions.tabAll')}</TabsTrigger>
+            <TabsTrigger value="income">{t('transactions.tabIncome')}</TabsTrigger>
+            <TabsTrigger value="expense">{t('transactions.tabExpenses')}</TabsTrigger>
           </TabsList>
         </Tabs>
         <p className="text-sm text-muted-foreground tabular-nums">
@@ -357,17 +364,17 @@ export default function Transactions() {
           <Input
             value={filters.search}
             onChange={(e) => set('search', e.target.value)}
-            placeholder="Search description"
+            placeholder={t('transactions.searchPlaceholder')}
             className="pl-9"
           />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {type === 'expense' && (
             <Select value={filters.category_id} onValueChange={(v) => set('category_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('transactions.categoryPlaceholder')} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-                <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                <SelectItem value="all">{t('transactions.allCategories')}</SelectItem>
+                <SelectItem value="uncategorized">{t('transactions.uncategorized')}</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
@@ -376,10 +383,10 @@ export default function Transactions() {
           )}
           {type === 'expense' && (
             <Select value={filters.payment_method} onValueChange={(v) => set('payment_method', v)}>
-              <SelectTrigger><SelectValue placeholder="Method" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('transactions.methodPlaceholder')} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All methods</SelectItem>
-                {PAYMENT_METHODS.map((m) => (
+                <SelectItem value="all">{t('transactions.allMethods')}</SelectItem>
+                {getPaymentMethods(t).map((m) => (
                   <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -387,10 +394,10 @@ export default function Transactions() {
           )}
           {type === 'income' && (
             <Select value={filters.source} onValueChange={(v) => set('source', v)}>
-              <SelectTrigger><SelectValue placeholder="Source" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('transactions.sourcePlaceholder')} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All sources</SelectItem>
-                {INCOME_SOURCES.map((s) => (
+                <SelectItem value="all">{t('transactions.allSources')}</SelectItem>
+                {incomeSources.map((s) => (
                   <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -401,7 +408,7 @@ export default function Transactions() {
 
       <div className="space-y-2">
         {filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground py-8 text-center">No transactions match your filters.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{t('transactions.noMatches')}</p>
         )}
         {filtered.map((row) =>
           row._type === 'expense' ? (
@@ -430,16 +437,16 @@ export default function Transactions() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
+            <AlertDialogTitle>{t('transactions.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget && `"${deleteTarget.description}" — ${fmt(deleteTarget.amount, deleteTarget.currency)}. `}
-              This can&apos;t be undone.
+              {deleteTarget && t('transactions.deleteDescription', { description: deleteTarget.description, amount: fmt(deleteTarget.amount, deleteTarget.currency) })}
+              {t('transactions.cannotUndo')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: 'destructive' })}>
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

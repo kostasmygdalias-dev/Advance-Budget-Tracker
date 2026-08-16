@@ -11,6 +11,7 @@ import { getMonthlyContribution, currentMonthStr } from '@/lib/finance';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useLanguage } from '@/lib/i18n';
 
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
@@ -31,6 +32,7 @@ function ProgressBar({ pct }) {
 }
 
 function BudgetRow({ category, spent, currency, value, onChange, indent }) {
+  const { t } = useLanguage();
   const amount = value === '' || value == null ? null : Number(value);
   const pct = amount > 0 ? (spent / amount) * 100 : 0;
   return (
@@ -43,7 +45,7 @@ function BudgetRow({ category, spent, currency, value, onChange, indent }) {
           step="0.01"
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="No budget"
+          placeholder={t('budgets.noBudget')}
           className="w-32"
         />
       </div>
@@ -51,7 +53,7 @@ function BudgetRow({ category, spent, currency, value, onChange, indent }) {
         <div className="ml-11">
           <ProgressBar pct={pct} />
           <p className="text-xs text-muted-foreground mt-1">
-            {fmt(spent, currency)} / {fmt(amount, currency)} · {pct.toFixed(0)}% this month
+            {fmt(spent, currency)} / {fmt(amount, currency)} · {t('budgets.thisMonth', { pct: pct.toFixed(0) })}
           </p>
         </div>
       )}
@@ -61,6 +63,7 @@ function BudgetRow({ category, spent, currency, value, onChange, indent }) {
 
 export default function Budgets() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -108,9 +111,9 @@ export default function Budgets() {
         budget_per_category: perCategory,
       });
       setSettings(updated);
-      toast({ title: 'Budgets saved' });
+      toast({ title: t('budgets.saved') });
     } catch (err) {
-      toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -163,23 +166,23 @@ export default function Budgets() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">Budgets</h1>
-          <p className="text-sm text-muted-foreground">Set a budget for any category, or one overall total.</p>
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('budgets.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('budgets.subtitle')}</p>
         </div>
         <Button onClick={save} disabled={saving}>
-          <Save className="w-4 h-4 mr-1" /> {saving ? 'Saving…' : 'Save budgets'}
+          <Save className="w-4 h-4 mr-1" /> {saving ? t('common.saving') : t('budgets.saveBudgets')}
         </Button>
       </div>
 
       <Card className="p-5 space-y-2">
         <div className="flex items-center gap-3">
-          <Label className="flex-1">Overall {budgetPeriod === 'weekly' ? 'weekly' : 'monthly'} budget</Label>
+          <Label className="flex-1">{budgetPeriod === 'weekly' ? t('budgets.overallWeeklyBudget') : t('budgets.overallMonthlyBudget')}</Label>
           <Input
             type="number"
             step="0.01"
             value={totalBudget}
             onChange={(e) => setTotalBudget(e.target.value)}
-            placeholder="Optional"
+            placeholder={t('common.optional')}
             className="w-32"
           />
         </div>
@@ -187,16 +190,16 @@ export default function Budgets() {
           <div>
             <ProgressBar pct={totalPct} />
             <p className="text-xs text-muted-foreground mt-1">
-              {fmt(totalSpentPeriod, currency)} / {fmt(totalAmount, currency)} · {totalPct.toFixed(0)}% this {budgetPeriod === 'weekly' ? 'week' : 'month'}
+              {fmt(totalSpentPeriod, currency)} / {fmt(totalAmount, currency)} · {budgetPeriod === 'weekly' ? t('budgets.thisWeek', { pct: totalPct.toFixed(0) }) : t('budgets.thisMonth', { pct: totalPct.toFixed(0) })}
             </p>
           </div>
         )}
       </Card>
 
       <Card className="p-5 space-y-5">
-        <p className="text-sm font-medium">Per category</p>
+        <p className="text-sm font-medium">{t('budgets.perCategory')}</p>
         {topLevel.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No categories yet — add some first.</p>
+          <p className="text-sm text-muted-foreground">{t('budgets.noCategoriesYet')}</p>
         ) : (
           topLevel.map((c) => (
             <div key={c.id} className="space-y-5">
