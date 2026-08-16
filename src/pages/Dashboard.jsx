@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -201,6 +201,10 @@ function CategoryBudgets({ rows, currency }) {
   );
 }
 
+// Below this many uncategorized expenses in the current month, the banner
+// stays hidden — a stray one or two isn't worth nagging about.
+const UNCATEGORIZED_ALERT_THRESHOLD = 3;
+
 // Which budget overages we've already toasted about, per calendar month — so
 // the alert fires once per overage, not on every single page visit. Keeps
 // only the last few months so this doesn't grow forever.
@@ -312,6 +316,10 @@ export default function Dashboard() {
   }));
   const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
   const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
+
+  const uncategorizedCount = expenses.filter((e) =>
+    !e.category_id && (e.currency || 'EUR') === currency && getMonthlyContribution(e, thisMonth) > 0
+  ).length;
 
   const recentTransactions = [
     ...expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date })),
@@ -592,6 +600,20 @@ export default function Dashboard() {
           </DropdownMenu>
         </div>
       </div>
+
+      {uncategorizedCount >= UNCATEGORIZED_ALERT_THRESHOLD && (
+        <Card className="p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 text-amber-600">
+            <Tag className="w-5 h-5 shrink-0" />
+            <p className="text-sm text-foreground">
+              <span className="font-medium">{uncategorizedCount} uncategorized expenses</span> this month — fill them in for more accurate budgets and reports.
+            </p>
+          </div>
+          <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
+            <Button variant="outline" size="sm">Review now</Button>
+          </Link>
+        </Card>
+      )}
 
       {customizing && (
         <Card className="p-4">

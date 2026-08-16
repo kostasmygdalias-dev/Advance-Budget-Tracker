@@ -150,7 +150,7 @@ export default function Transactions() {
   const [month, setMonth] = useState(initialMonth);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [filters, setFilters] = useState({
-    search: '', category_id: 'all', payment_method: 'all', source: 'all',
+    search: '', category_id: searchParams.get('category') || 'all', payment_method: 'all', source: 'all',
   });
 
   const load = () => {
@@ -212,7 +212,8 @@ export default function Transactions() {
       if (type !== 'all' && row._type !== type) return false;
       if (filters.search && !(row.description || '').toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (row._type === 'expense') {
-        if (filters.category_id !== 'all' && row.category_id !== filters.category_id) return false;
+        if (filters.category_id === 'uncategorized' && row.category_id) return false;
+        if (filters.category_id !== 'all' && filters.category_id !== 'uncategorized' && row.category_id !== filters.category_id) return false;
         if (filters.payment_method !== 'all' && row.payment_method !== filters.payment_method) return false;
       } else if (filters.source !== 'all' && row.source !== filters.source) return false;
       return true;
@@ -366,6 +367,7 @@ export default function Transactions() {
               <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All categories</SelectItem>
+                <SelectItem value="uncategorized">Uncategorized</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
