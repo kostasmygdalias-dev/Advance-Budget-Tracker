@@ -11,7 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area,
+  PieChart, Pie, Cell,
 } from 'recharts';
 import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, isInMonth,
@@ -48,7 +48,6 @@ const WIDGET_DEFS = [
   { id: 'thisMonth', label: 'This month', span: 'half' },
   { id: 'lastMonth', label: 'Last month', span: 'half' },
   { id: 'recentTransactions', label: 'Recent transactions', span: 'full' },
-  { id: 'hero', label: 'Net this month', span: 'full' },
   { id: 'budget', label: 'Overall budget', span: 'half' },
   { id: 'categoryBudgets', label: 'Category budgets', span: 'full' },
   { id: 'avgSpent', label: 'Avg spent / month', span: 'half' },
@@ -311,11 +310,8 @@ export default function Dashboard() {
     income: incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, m) ? i.amount || 0 : 0), 0),
     expenses: expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, m) : 0), 0),
   }));
-  const netTrendData = trendData.map((d) => ({ month: d.month, net: d.income - d.expenses }));
-
   const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
   const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
-  const currentNet = currentIncomeTotal - currentExpenseTotal;
 
   const recentTransactions = [
     ...expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date })),
@@ -327,10 +323,6 @@ export default function Dashboard() {
   const [lastMonth] = getRecentMonths(2);
   const lastMonthExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, lastMonth) : 0), 0);
   const lastMonthIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, lastMonth) ? i.amount || 0 : 0), 0);
-
-  const otherCurrencyCount =
-    expenses.filter((e) => (e.currency || 'EUR') !== currency && getMonthlyContribution(e, thisMonth) > 0).length +
-    incomes.filter((i) => (i.currency || 'EUR') !== currency && isInMonth(i.received_date, thisMonth)).length;
 
   const byCategory = {};
   expenses.forEach((e) => {
@@ -444,48 +436,6 @@ export default function Dashboard() {
         return <MonthWidget label={monthName(lastMonth)} month={lastMonth} income={lastMonthIncomeTotal} expenses={lastMonthExpenseTotal} currency={currency} />;
       case 'recentTransactions':
         return <RecentTransactions rows={recentTransactions} catMap={catMap} />;
-      case 'hero':
-        return (
-          <Card className="p-6 md:p-8">
-            <p className="text-sm text-muted-foreground">Net this month</p>
-            <p className={`text-5xl md:text-6xl font-heading font-bold mt-2 tabular-nums ${currentNet >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-              {currentNet >= 0 ? '+' : ''}{fmt(currentNet, currency)}
-            </p>
-            <div className="h-16 mt-4 -mx-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={netTrendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id="netFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.25} />
-                      <stop offset="100%" stopColor={currentNet >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    formatter={(v) => fmt(v, currency)}
-                    labelFormatter={() => ''}
-                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
-                  />
-                  <Area type="monotone" dataKey="net" stroke={currentNet >= 0 ? '#10b981' : '#ef4444'} strokeWidth={2} fill="url(#netFill)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center gap-6 pt-4 mt-2 border-t">
-              <div>
-                <p className="text-xs text-muted-foreground">Income</p>
-                <p className="text-lg font-semibold tabular-nums text-emerald-600">+{fmt(currentIncomeTotal, currency)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Spent</p>
-                <p className="text-lg font-semibold tabular-nums">{fmt(currentExpenseTotal, currency)}</p>
-              </div>
-            </div>
-            {otherCurrencyCount > 0 && (
-              <p className="text-xs text-muted-foreground mt-3">
-                Showing {currency} only — {otherCurrencyCount} transaction{otherCurrencyCount === 1 ? '' : 's'} in other currencies this month {otherCurrencyCount === 1 ? "isn't" : "aren't"} included (amounts aren't converted). <Link to="/transactions" className="underline">View them</Link>.
-              </p>
-            )}
-          </Card>
-        );
       case 'budget':
         return (
           <Link to="/budgets" className="block group h-full">
