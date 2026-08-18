@@ -129,6 +129,8 @@ export const el = {
   transactions: {
     title: 'Συναλλαγές',
     allTime: 'Όλες οι περίοδοι',
+    customRange: 'Προσαρμοσμένο εύρος',
+    useMonthView: 'Πίσω στην προβολή μήνα',
     tabAll: 'Όλα',
     tabIncome: 'Έσοδα',
     tabExpenses: 'Έξοδα',

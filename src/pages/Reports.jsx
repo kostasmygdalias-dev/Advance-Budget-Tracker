@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
-import { amountIncludingChildren } from '@/lib/categoryTree';
+import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -142,18 +142,41 @@ export default function Reports() {
     categoryTotals[key] = (categoryTotals[key] || 0) + contrib;
     categoryCounts[key] = (categoryCounts[key] || 0) + 1;
   });
-  const categoryReport = Object.entries(categoryTotals)
-    .map(([id, total]) => ({
-      id,
-      name: id === 'uncategorized' ? t('transactions.uncategorized') : (catMap[id]?.name || t('common.categoryFallback')),
-      parentName: id !== 'uncategorized' && catMap[id]?.parent_id ? catMap[catMap[id].parent_id]?.name : null,
-      color: id === 'uncategorized' ? '#94a3b8' : (catMap[id]?.color || PALETTE[0]),
-      total,
-      count: categoryCounts[id],
-      avg: total / categoryCounts[id],
-      pct: totalExpense > 0 ? (total / totalExpense) * 100 : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
+  // Grouped by top-level category, each rolling up its subcategories'
+  // totals (same rollup already used for budget vs. actual below) — so
+  // "how much did I spend on Transport" reads as one number even when every
+  // transaction is actually tagged to Fuel/Parking/etc underneath it.
+  const categoryReport = [];
+  let currentGroup = null;
+  flattenCategoryTree(categories).forEach((c) => {
+    if (c.depth === 0) {
+      const total = amountIncludingChildren(c.id, categoryTotals, categories);
+      currentGroup = total > 0 ? {
+        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
+        total, count: categoryCounts[c.id] || 0, children: [],
+      } : null;
+      if (currentGroup) categoryReport.push(currentGroup);
+    } else if (currentGroup && categoryTotals[c.id] > 0) {
+      currentGroup.count += categoryCounts[c.id] || 0;
+      currentGroup.children.push({
+        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
+        total: categoryTotals[c.id], count: categoryCounts[c.id] || 0,
+      });
+    }
+  });
+  if (categoryTotals.uncategorized > 0) {
+    categoryReport.push({
+      id: 'uncategorized', name: t('transactions.uncategorized'), color: '#94a3b8', icon: null,
+      total: categoryTotals.uncategorized, count: categoryCounts.uncategorized || 0, children: [],
+    });
+  }
+  categoryReport.forEach((g) => {
+    g.pct = totalExpense > 0 ? (g.total / totalExpense) * 100 : 0;
+    g.children.sort((a, b) => b.total - a.total).forEach((c) => {
+      c.pct = totalExpense > 0 ? (c.total / totalExpense) * 100 : 0;
+    });
+  });
+  categoryReport.sort((a, b) => b.total - a.total);
 
   // Income by source, for the whole range.
   const sourceTotals = {};
@@ -325,17 +348,25 @@ export default function Reports() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {categoryReport.map((d) => (
-                  <div key={d.id} className="flex items-center gap-3 text-sm">
-                    <IconAvatar icon={(props) => <CategoryIcon name={catMap[d.id]?.icon} {...props} />} color={d.color} className="w-7 h-7" />
-                    <span className="flex-1 min-w-0 truncate">
-                      {d.name}
-                      {d.parentName && <span className="text-muted-foreground"> · {d.parentName}</span>}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{d.count}×</span>
-                    <span className="text-xs text-muted-foreground w-10 text-right">{d.pct.toFixed(0)}%</span>
-                    <span className="tabular-nums font-medium w-20 text-right">{fmt(d.total, currency)}</span>
+                  <div key={d.id} className="space-y-1">
+                    <div className="flex items-center gap-3 text-sm">
+                      <IconAvatar icon={(props) => <CategoryIcon name={d.icon} {...props} />} color={d.color} className="w-7 h-7" />
+                      <span className="flex-1 min-w-0 truncate font-medium">{d.name}</span>
+                      <span className="text-xs text-muted-foreground">{d.count}×</span>
+                      <span className="text-xs text-muted-foreground w-10 text-right">{d.pct.toFixed(0)}%</span>
+                      <span className="tabular-nums font-medium w-20 text-right">{fmt(d.total, currency)}</span>
+                    </div>
+                    {d.children.map((c) => (
+                      <div key={c.id} className="flex items-center gap-3 text-sm ml-7 pl-3 border-l">
+                        <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-6 h-6" />
+                        <span className="flex-1 min-w-0 truncate text-muted-foreground">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">{c.count}×</span>
+                        <span className="text-xs text-muted-foreground w-10 text-right">{c.pct.toFixed(0)}%</span>
+                        <span className="tabular-nums w-20 text-right">{fmt(c.total, currency)}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

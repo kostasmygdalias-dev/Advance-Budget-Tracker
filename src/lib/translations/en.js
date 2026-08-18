@@ -129,6 +129,8 @@ export const en = {
   transactions: {
     title: 'Transactions',
     allTime: 'All time',
+    customRange: 'Custom range',
+    useMonthView: 'Back to month view',
     tabAll: 'All',
     tabIncome: 'Income',
     tabExpenses: 'Expenses',

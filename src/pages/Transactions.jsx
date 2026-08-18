@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -203,6 +204,15 @@ export default function Transactions() {
   const [filters, setFilters] = useState({
     search: '', category_id: searchParams.get('category') || 'all', payment_method: 'all', source: 'all',
   });
+  // An explicit alternative to month-browsing — either bound can be set
+  // alone (open-ended) or both together. Takes over from `month` entirely
+  // while either is non-empty.
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const clearCustomRange = () => {
+    setDateRange({ from: '', to: '' });
+    setCustomRangeOpen(false);
+  };
 
   const load = () => {
     setLoading(true);
@@ -257,19 +267,39 @@ export default function Transactions() {
     return [...exp, ...inc].sort((a, b) => (b._date || '').localeCompare(a._date || ''));
   }, [expenses, incomes]);
 
+  // Selecting a parent category rolls up to include its subcategories too —
+  // otherwise "Transport" would only match transactions tagged to Transport
+  // itself, never Fuel/Parking underneath it.
+  const categoryFilterIds = useMemo(() => {
+    if (filters.category_id === 'all' || filters.category_id === 'uncategorized') return null;
+    const ids = new Set([filters.category_id]);
+    categories.forEach((c) => { if (c.parent_id === filters.category_id) ids.add(c.id); });
+    return ids;
+  }, [filters.category_id, categories]);
+
   const filtered = useMemo(() => {
+    const hasCustomRange = dateRange.from || dateRange.to;
     return combined.filter((row) => {
-      if (month && !(row._date || '').startsWith(month)) return false;
+      if (hasCustomRange) {
+        if (dateRange.from && (row._date || '') < dateRange.from) return false;
+        if (dateRange.to && (row._date || '') > dateRange.to) return false;
+      } else if (month && !(row._date || '').startsWith(month)) return false;
       if (type !== 'all' && row._type !== type) return false;
       if (filters.search && !(row.description || '').toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (row._type === 'expense') {
         if (filters.category_id === 'uncategorized' && row.category_id) return false;
-        if (filters.category_id !== 'all' && filters.category_id !== 'uncategorized' && row.category_id !== filters.category_id) return false;
+        if (categoryFilterIds && !categoryFilterIds.has(row.category_id)) return false;
         if (filters.payment_method !== 'all' && row.payment_method !== filters.payment_method) return false;
-      } else if (filters.source !== 'all' && row.source !== filters.source) return false;
+      } else {
+        // A category filter is expense-only — no income row can ever match
+        // a specific category or "uncategorized," so filter them all out
+        // rather than silently ignoring the filter for this type.
+        if (filters.category_id !== 'all') return false;
+        if (filters.source !== 'all' && row.source !== filters.source) return false;
+      }
       return true;
     });
-  }, [combined, type, month, filters]);
+  }, [combined, type, month, filters, dateRange, categoryFilterIds]);
 
   // Grouped by currency rather than blindly summed — mixing currencies into
   // one number would be silently wrong (same reasoning as the Dashboard fix).
@@ -376,27 +406,58 @@ export default function Transactions() {
         </DropdownMenu>
       </div>
 
-      <Card className="p-3 flex items-center justify-between gap-3">
-        {month ? (
-          <>
-            <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, -1))}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <button onClick={() => changeMonth(null)} className="text-sm font-medium hover:underline">
-              {monthLabel(month, lang)}
-            </button>
-            <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </>
+      <Card className="p-3 space-y-2">
+        {customRangeOpen ? (
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="space-y-1.5">
+              <Label htmlFor="txn-from" className="text-xs">{t('reports.from')}</Label>
+              <Input
+                id="txn-from" type="date" value={dateRange.from}
+                onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
+                className="w-40"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="txn-to" className="text-xs">{t('reports.to')}</Label>
+              <Input
+                id="txn-to" type="date" value={dateRange.to}
+                onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
+                className="w-40"
+              />
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearCustomRange}>{t('transactions.useMonthView')}</Button>
+          </div>
         ) : (
-          <>
-            <span />
-            <button onClick={() => changeMonth(currentMonthStr())} className="text-sm font-medium hover:underline">
-              {t('transactions.allTime')}
+          <div className="flex items-center justify-between gap-3">
+            {month ? (
+              <>
+                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, -1))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <button onClick={() => changeMonth(null)} className="text-sm font-medium hover:underline">
+                  {monthLabel(month, lang)}
+                </button>
+                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span />
+                <button onClick={() => changeMonth(currentMonthStr())} className="text-sm font-medium hover:underline">
+                  {t('transactions.allTime')}
+                </button>
+                <span />
+              </>
+            )}
+          </div>
+        )}
+        {!customRangeOpen && (
+          <div className="flex justify-center">
+            <button onClick={() => setCustomRangeOpen(true)} className="text-xs text-muted-foreground hover:underline">
+              {t('transactions.customRange')}
             </button>
-            <span />
-          </>
+          </div>
         )}
       </Card>
 
@@ -424,7 +485,7 @@ export default function Transactions() {
           />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {type === 'expense' && (
+          {type !== 'income' && (
             <Select value={filters.category_id} onValueChange={(v) => set('category_id', v)}>
               <SelectTrigger><SelectValue placeholder={t('transactions.categoryPlaceholder')} /></SelectTrigger>
               <SelectContent>
