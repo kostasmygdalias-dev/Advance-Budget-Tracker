@@ -68,6 +68,7 @@ export default function Reports() {
   const [loadError, setLoadError] = useState(null);
   const [fromMonth, setFromMonth] = useState(getRecentMonths(6)[0]);
   const [toMonth, setToMonth] = useState(currentMonthStr());
+  const [focusCategoryId, setFocusCategoryId] = useState('all');
 
   const load = () => {
     setLoading(true);
@@ -177,6 +178,28 @@ export default function Reports() {
     });
   });
   categoryReport.sort((a, b) => b.total - a.total);
+
+  // Drill-down for whichever single category the user focused (a top-level
+  // group with its children, a child on its own, or nothing when "all").
+  // Reuses categoryReport's already-rolled-up totals rather than
+  // recomputing them, and adds the one thing that view can't show: a
+  // month-by-month trend for just this category.
+  const focusGroup = focusCategoryId !== 'all' ? categoryReport.find((g) => g.id === focusCategoryId) : null;
+  const focusChild = !focusGroup && focusCategoryId !== 'all'
+    ? categoryReport.flatMap((g) => g.children).find((c) => c.id === focusCategoryId)
+    : null;
+  const focusEntry = focusGroup || focusChild;
+  const focusMonthlyIds = focusGroup
+    ? new Set([focusGroup.id, ...focusGroup.children.map((c) => c.id)])
+    : (focusChild ? new Set([focusChild.id]) : null);
+  const focusMonthly = focusMonthlyIds ? months.map((m) => ({
+    month: monthLabel(m, lang),
+    total: expenses.reduce((s, e) => {
+      if ((e.currency || 'EUR') !== currency) return s;
+      if (!focusMonthlyIds.has(e.category_id || 'uncategorized')) return s;
+      return s + getMonthlyContribution(e, m);
+    }, 0),
+  })) : [];
 
   // Income by source, for the whole range.
   const sourceTotals = {};
@@ -333,9 +356,61 @@ export default function Reports() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <p className="text-sm font-medium mb-4">{t('reports.spendingByCategory')}</p>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <p className="text-sm font-medium">{t('reports.spendingByCategory')}</p>
+            {categoryReport.length > 0 && (
+              <Select value={focusCategoryId} onValueChange={setFocusCategoryId}>
+                <SelectTrigger className="w-48 h-8 text-xs"><SelectValue placeholder={t('reports.focusCategory')} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('reports.allCategories')}</SelectItem>
+                  {categoryReport.flatMap((g) => [
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>,
+                    ...g.children.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="pl-6 text-muted-foreground">↳ {c.name}</SelectItem>
+                    )),
+                  ])}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           {categoryReport.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('reports.noSpendingInRange')}</p>
+          ) : focusEntry ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <IconAvatar icon={(props) => <CategoryIcon name={focusEntry.icon} {...props} />} color={focusEntry.color} className="w-10 h-10" />
+                <div>
+                  <p className="text-sm font-medium">{focusEntry.name}</p>
+                  <p className="text-2xl font-heading font-semibold tabular-nums">{fmt(focusEntry.total, currency)}</p>
+                </div>
+              </div>
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={focusMonthly} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                    <Tooltip formatter={(v) => fmt(v, currency)} cursor={{ fill: 'hsl(var(--muted))' }} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                    <Bar dataKey="total" name={t('reports.spendingTrend')} fill={focusEntry.color} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {focusGroup && (
+                focusGroup.children.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t('reports.noSubcategorySpending')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {focusGroup.children.map((c) => (
+                      <div key={c.id} className="flex items-center gap-3 text-sm">
+                        <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-7 h-7" />
+                        <span className="flex-1 min-w-0 truncate">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">{c.count}×</span>
+                        <span className="tabular-nums font-medium w-20 text-right">{fmt(c.total, currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
           ) : (
             <>
               <div className="h-48 mb-4">
