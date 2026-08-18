@@ -50,6 +50,8 @@ export default [
       ],
       "react/prop-types": "off",
       "react/react-in-jsx-scope": "off",
+      "react/jsx-no-undef": "error",
+      "no-undef": "error",
       "react/no-unknown-property": [
         "error",
         { ignore: ["cmdk-input-wrapper", "toast-close"] },
