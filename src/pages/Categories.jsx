@@ -12,6 +12,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { guessIconForName } from '@/lib/categoryIconGuess';
 import { useLanguage } from '@/lib/i18n';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -54,6 +55,10 @@ export default function Categories() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null); // {id?, name, icon, color, parent_id}
+  // Once the user manually picks a color/icon for a *new* category, stop
+  // auto-guessing from the name/parent so we don't clobber their choice.
+  const [colorTouched, setColorTouched] = useState(false);
+  const [iconTouched, setIconTouched] = useState(false);
   const [addingDefaults, setAddingDefaults] = useState(false);
 
   const load = () => {
@@ -64,8 +69,39 @@ export default function Categories() {
 
   useEffect(() => { load(); }, []);
 
-  const openNew = () => setEditing({ name: '', icon: ICONS[0], color: COLORS[1], parent_id: '__none__' });
-  const openEdit = (c) => setEditing({ ...c, parent_id: c.parent_id || '__none__' });
+  const openNew = () => {
+    setColorTouched(false);
+    setIconTouched(false);
+    setEditing({ name: '', icon: ICONS[0], color: COLORS[1], parent_id: '__none__' });
+  };
+  const openEdit = (c) => {
+    // Editing an existing category should never auto-change its color/icon.
+    setColorTouched(true);
+    setIconTouched(true);
+    setEditing({ ...c, parent_id: c.parent_id || '__none__' });
+  };
+
+  const updateName = (name) => {
+    setEditing((prev) => {
+      const next = { ...prev, name };
+      if (!prev.id && !iconTouched) {
+        const guess = guessIconForName(name);
+        if (guess) next.icon = guess;
+      }
+      return next;
+    });
+  };
+
+  const updateParent = (parent_id) => {
+    setEditing((prev) => {
+      const next = { ...prev, parent_id };
+      if (!prev.id && !colorTouched && parent_id !== '__none__') {
+        const parent = categories.find((c) => c.id === parent_id);
+        if (parent?.color) next.color = parent.color;
+      }
+      return next;
+    });
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -206,11 +242,11 @@ export default function Categories() {
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="cat-name">{t('categories.name')}</Label>
-                <Input id="cat-name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus />
+                <Input id="cat-name" value={editing.name} onChange={(e) => updateName(e.target.value)} autoFocus />
               </div>
               <div className="space-y-2">
                 <Label>{t('categories.parentOptional')}</Label>
-                <Select value={editing.parent_id} onValueChange={(v) => setEditing({ ...editing, parent_id: v })}>
+                <Select value={editing.parent_id} onValueChange={updateParent}>
                   <SelectTrigger><SelectValue placeholder={t('categories.noneTopLevel')} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">{t('categories.noneTopLevel')}</SelectItem>
@@ -227,7 +263,7 @@ export default function Categories() {
                     <button
                       key={col}
                       type="button"
-                      onClick={() => setEditing({ ...editing, color: col })}
+                      onClick={() => { setColorTouched(true); setEditing({ ...editing, color: col }); }}
                       className="w-7 h-7 rounded-full border-2"
                       style={{ background: col, borderColor: editing.color === col ? '#0f172a' : 'transparent' }}
                     />
@@ -236,7 +272,7 @@ export default function Categories() {
               </div>
               <div className="space-y-2">
                 <Label>{t('categories.icon')}</Label>
-                <Select value={editing.icon} onValueChange={(v) => setEditing({ ...editing, icon: v })}>
+                <Select value={editing.icon} onValueChange={(v) => { setIconTouched(true); setEditing({ ...editing, icon: v }); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ICONS.map((ic) => (
