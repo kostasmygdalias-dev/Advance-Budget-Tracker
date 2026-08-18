@@ -128,14 +128,24 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background">
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col border-r bg-sidebar">
-        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
-          <button className="flex items-center gap-2 px-6 h-16 border-b w-full hover:bg-sidebar-accent/40 transition-colors">
+        <div className="flex items-center h-16 border-b">
+          <Link
+            to="/"
+            className="flex items-center gap-2 flex-1 min-w-0 h-full pl-6 pr-2 hover:bg-sidebar-accent/40 transition-colors"
+          >
             <Wallet className="w-5 h-5 text-primary shrink-0" />
-            <span className="font-heading font-semibold tracking-tight flex-1 text-left truncate">ExpenseTrack</span>
+            <span className="font-heading font-semibold tracking-tight truncate">ExpenseTrack</span>
             {!subLoading && <PlanBadge isPro={isPro} />}
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </button>
-        </AccountMenu>
+          </Link>
+          <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
+            <button
+              className="h-full px-3 flex items-center hover:bg-sidebar-accent/40 transition-colors shrink-0"
+              aria-label={t('accountMenu.openMenu')}
+            >
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </AccountMenu>
+        </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -211,12 +221,20 @@ export default function Layout() {
             </nav>
           </SheetContent>
         </Sheet>
+        <Link
+          to="/"
+          className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
+        >
+          <Wallet className="w-5 h-5 text-primary shrink-0" />
+          <span className="font-heading font-semibold truncate">ExpenseTrack</span>
+          {!subLoading && <PlanBadge isPro={isPro} />}
+        </Link>
         <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
-          <button className="flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md hover:bg-muted transition-colors">
-            <Wallet className="w-5 h-5 text-primary shrink-0" />
-            <span className="font-heading font-semibold truncate">ExpenseTrack</span>
-            {!subLoading && <PlanBadge isPro={isPro} />}
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          <button
+            className="p-2 rounded-md hover:bg-muted transition-colors shrink-0"
+            aria-label={t('accountMenu.openMenu')}
+          >
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
         </AccountMenu>
       </header>

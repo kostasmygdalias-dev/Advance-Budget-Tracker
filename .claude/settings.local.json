@@ -126,7 +126,14 @@
       "Bash(curl -s http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces)",
       "Bash(curl -s \"http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces/d99709ead59f48cebb54667752dddc42/keys\")",
       "Bash(curl -s \"http://localhost:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces/d99709ead59f48cebb54667752dddc42/values/sub%3Agoogle-sub-abc\")",
-      "Bash(lsof -ti:8787 -sTCP:LISTEN)"
+      "Bash(lsof -ti:8787 -sTCP:LISTEN)",
+      "Bash(git remote *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -i \"^\\\\.env$\\\\|^\\\\.env\\\\.local\")",
+      "Bash(curl -s https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker)",
+      "Bash(curl -s https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/branches)",
+      "Bash(curl -s https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/branches/main)",
+      "Bash(curl -s https://api.github.com/repos/kostasmygdalias-dev/Advance-Budget-Tracker/git/trees/cfaf5cc05bd9c9f5792758333fc21aaa73319146)"
     ],
     "additionalDirectories": [
       "\\tmp"
