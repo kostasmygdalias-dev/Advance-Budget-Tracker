@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -9,6 +9,7 @@ import { LanguageProvider } from '@/lib/i18n';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Layout from '@/components/Layout';
+import ChunkErrorBoundary, { clearChunkReloadFlag } from '@/components/ChunkErrorBoundary';
 
 // Each page is its own chunk, so signing in (or any single page) only
 // downloads and parses the JS that page actually needs — e.g. the Login
@@ -34,33 +35,41 @@ const PageSpinner = () => (
 const AuthenticatedApp = () => {
   const { isLoadingAuth } = useAuth();
 
+  // The app rendered past loading, so it's on a current bundle — safe to
+  // let a *future* deploy trigger the auto-reload again in this same tab.
+  useEffect(() => {
+    if (!isLoadingAuth) clearChunkReloadFlag();
+  }, [isLoadingAuth]);
+
   if (isLoadingAuth) return <PageSpinner />;
 
   return (
-    <Suspense fallback={<PageSpinner />}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/expenses" element={<Navigate to="/transactions?type=expense" replace />} />
-            <Route path="/expenses/new" element={<AddEditExpense />} />
-            <Route path="/expenses/:id/edit" element={<AddEditExpense />} />
-            <Route path="/income" element={<Navigate to="/transactions?type=income" replace />} />
-            <Route path="/income/new" element={<AddEditIncome />} />
-            <Route path="/income/:id/edit" element={<AddEditIncome />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/recurring" element={<Recurring />} />
-            <Route path="/goals" element={<Goals />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/settings" element={<SettingsPage />} />
+    <ChunkErrorBoundary>
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/expenses" element={<Navigate to="/transactions?type=expense" replace />} />
+              <Route path="/expenses/new" element={<AddEditExpense />} />
+              <Route path="/expenses/:id/edit" element={<AddEditExpense />} />
+              <Route path="/income" element={<Navigate to="/transactions?type=income" replace />} />
+              <Route path="/income/new" element={<AddEditIncome />} />
+              <Route path="/income/:id/edit" element={<AddEditIncome />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/recurring" element={<Recurring />} />
+              <Route path="/goals" element={<Goals />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
           </Route>
-        </Route>
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </Suspense>
+    </ChunkErrorBoundary>
   );
 };
 
