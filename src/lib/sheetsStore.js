@@ -406,7 +406,11 @@ const RecurringTemplateSchema = z.object({
 });
 const SettingsSchema = z.object({
   id: z.string().min(1), default_currency: z.string(), monthly_budget_total: z.number().nullable(),
-  budget_per_category: z.record(z.string(), z.number()), created_date: z.string(), budget_period: z.string(),
+  // Loosely typed on purpose: this is a single row holding every setting
+  // (currency, layout, budgets) — over-validating one field (e.g. requiring
+  // every value be a number) would drop the *whole* row, including
+  // unrelated settings, over a shape mismatch in just this one map.
+  budget_per_category: z.record(z.string(), z.any()), created_date: z.string(), budget_period: z.string(),
   dashboard_layout: z.any(), ...RowMeta,
 });
 const DebtSchema = z.object({
