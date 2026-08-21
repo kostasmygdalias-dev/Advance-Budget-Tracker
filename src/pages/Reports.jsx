@@ -10,12 +10,14 @@ import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
+import { Download, Printer } from 'lucide-react';
 import {
   getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths,
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
+import { downloadCsv } from '@/lib/exportFile';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -132,6 +134,21 @@ export default function Reports() {
 
   const totalIncome = monthly.reduce((s, d) => s + d.income, 0);
   const totalExpense = monthly.reduce((s, d) => s + d.expense, 0);
+
+  const exportCsv = () => {
+    const columns = [
+      { key: 'month', label: t('reports.csvMonth') },
+      { key: 'income', label: t('reports.csvIncome') },
+      { key: 'expense', label: t('reports.csvExpenses') },
+      { key: 'net', label: t('reports.csvNet') },
+      { key: 'savingsRate', label: t('reports.csvSavingsRate') },
+    ];
+    const rows = monthly.map((d) => ({
+      month: d.month, income: d.income.toFixed(2), expense: d.expense.toFixed(2),
+      net: d.net.toFixed(2), savingsRate: d.savingsRate.toFixed(1),
+    }));
+    downloadCsv(`report-${fromMonth}-to-${toMonth}.csv`, columns, rows);
+  };
 
   // Spending by category, for the whole range.
   const categoryTotals = {};
@@ -257,9 +274,17 @@ export default function Reports() {
           <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('reports.title')}</h1>
           <p className="text-sm text-muted-foreground">{monthLabel(fromMonth, lang)} – {monthLabel(toMonth, lang)}</p>
         </div>
+        <div className="flex items-center gap-2 no-print">
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="w-4 h-4 mr-1" /> {t('reports.exportCsv')}
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="w-4 h-4 mr-1" /> {t('reports.exportPdf')}
+          </Button>
+        </div>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4 no-print">
         <div className="flex items-end gap-3 flex-wrap">
           <div className="space-y-1.5">
             <Label htmlFor="from-month" className="text-xs">{t('reports.from')}</Label>

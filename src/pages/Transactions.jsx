@@ -17,11 +17,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers } from 'lucide-react';
+import { ToastAction } from '@/components/ui/toast';
+import {
+  Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
+  Download, ListChecks, X, Tags,
+} from 'lucide-react';
 import { monthLabel, currentMonthStr } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
+import { downloadCsv } from '@/lib/exportFile';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -93,14 +98,18 @@ function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
   );
 }
 
-function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, onToggleReconciled }) {
+function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, onToggleReconciled, selectMode, selected, onToggleSelect }) {
   const { t, lang } = useLanguage();
   const PAYMENT_METHODS = getPaymentMethods(t);
   const color = cat?.color || '#94a3b8';
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
-        <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
+        {selectMode ? (
+          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
+        ) : (
+          <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
+        )}
         <button onClick={onToggle} className="text-muted-foreground">
           {e.expense_type === 'amortized' ? (
             isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
@@ -151,14 +160,18 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
   );
 }
 
-function IncomeRow({ i, onCopy, onDelete, onToggleReconciled }) {
+function IncomeRow({ i, onCopy, onDelete, onToggleReconciled, selectMode, selected, onToggleSelect }) {
   const { t } = useLanguage();
   const incomeSources = getIncomeSources(t);
   const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
       <div className="flex items-center gap-3 p-4">
-        <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
+        {selectMode ? (
+          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
+        ) : (
+          <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
+        )}
         <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
@@ -200,7 +213,9 @@ export default function Transactions() {
   const [expanded, setExpanded] = useState({});
   const [type, setType] = useState(initialType);
   const [month, setMonth] = useState(initialMonth);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [filters, setFilters] = useState({
     search: '', category_id: searchParams.get('category') || 'all', payment_method: 'all', source: 'all',
   });
@@ -373,19 +388,115 @@ export default function Transactions() {
     }
   };
 
-  const confirmDelete = async () => {
-    const target = deleteTarget;
-    setDeleteTarget(null);
+  // Optimistic delete with an Undo action, instead of a confirm dialog —
+  // faster for the common case, and just as safe since Undo re-creates the
+  // row (as a new record; Sheets rows have no stable way to "un-delete").
+  const undoDelete = async (row) => {
     try {
-      if (target._type === 'expense') {
-        await entities.Expense.delete(target.id);
-      } else {
-        await entities.Income.delete(target.id);
-      }
-      load();
+      const created = row._type === 'expense' ? await entities.Expense.create(row) : await entities.Income.create(row);
+      if (row._type === 'expense') setExpenses((prev) => [...prev, created]);
+      else setIncomes((prev) => [...prev, created]);
+      toast({ title: t('transactions.restoredToastTitle') });
     } catch (err) {
+      toast({ title: t('transactions.couldNotRestore'), description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const deleteRow = async (row) => {
+    if (row._type === 'expense') setExpenses((prev) => prev.filter((e) => e.id !== row.id));
+    else setIncomes((prev) => prev.filter((i) => i.id !== row.id));
+    try {
+      if (row._type === 'expense') await entities.Expense.delete(row.id);
+      else await entities.Income.delete(row.id);
+      toast({
+        title: t('transactions.deletedToastTitle'),
+        description: t('transactions.deletedToastDescription', { description: row.description }),
+        action: <ToastAction altText={t('transactions.undo')} onClick={() => undoDelete(row)}>{t('transactions.undo')}</ToastAction>,
+      });
+    } catch (err) {
+      if (row._type === 'expense') setExpenses((prev) => [...prev, row]);
+      else setIncomes((prev) => [...prev, row]);
       toast({ title: t('common.couldNotDelete'), description: err.message, variant: 'destructive' });
     }
+  };
+
+  const selectionKey = (row) => `${row._type}:${row.id}`;
+  const selectedRows = useMemo(() => combined.filter((r) => selected.has(selectionKey(r))), [combined, selected]);
+
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelected(new Set());
+  };
+
+  const toggleSelect = (row) => {
+    const key = selectionKey(row);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAllFiltered = () => setSelected(new Set(filtered.map(selectionKey)));
+  const clearSelection = () => setSelected(new Set());
+
+  const bulkDelete = async () => {
+    const rows = selectedRows;
+    setBulkDeleteOpen(false);
+    try {
+      await Promise.all(rows.map((r) => (r._type === 'expense' ? entities.Expense.delete(r.id) : entities.Income.delete(r.id))));
+      setExpenses((prev) => prev.filter((e) => !selected.has(selectionKey({ ...e, _type: 'expense' }))));
+      setIncomes((prev) => prev.filter((i) => !selected.has(selectionKey({ ...i, _type: 'income' }))));
+      toast({ title: rows.length === 1 ? t('transactions.bulkDeletedOne', { count: 1 }) : t('transactions.bulkDeletedOther', { count: rows.length }) });
+      toggleSelectMode();
+    } catch (err) {
+      toast({ title: t('transactions.couldNotBulkDelete'), description: err.message, variant: 'destructive' });
+      load();
+    }
+  };
+
+  const bulkRecategorize = async (categoryId) => {
+    const rows = selectedRows.filter((r) => r._type === 'expense');
+    try {
+      await Promise.all(rows.map((r) => entities.Expense.update(r.id, { category_id: categoryId })));
+      const expenseKeys = new Set(rows.map(selectionKey));
+      setExpenses((prev) => prev.map((e) => (expenseKeys.has(selectionKey({ ...e, _type: 'expense' })) ? { ...e, category_id: categoryId } : e)));
+      toast({ title: rows.length === 1 ? t('transactions.bulkRecategorizedOne', { count: 1 }) : t('transactions.bulkRecategorizedOther', { count: rows.length }) });
+      toggleSelectMode();
+    } catch (err) {
+      toast({ title: t('transactions.couldNotBulkRecategorize'), description: err.message, variant: 'destructive' });
+      load();
+    }
+  };
+
+  const exportCsv = () => {
+    const PAYMENT_METHODS = getPaymentMethods(t);
+    const columns = [
+      { key: 'type', label: t('transactions.csvType') },
+      { key: 'date', label: t('transactions.csvDate') },
+      { key: 'description', label: t('transactions.csvDescription') },
+      { key: 'category', label: t('transactions.csvCategory') },
+      { key: 'amount', label: t('transactions.csvAmount') },
+      { key: 'currency', label: t('transactions.csvCurrency') },
+      { key: 'methodOrSource', label: t('transactions.csvMethodOrSource') },
+      { key: 'notes', label: t('transactions.csvNotes') },
+      { key: 'reconciled', label: t('transactions.csvReconciled') },
+    ];
+    const rows = filtered.map((row) => ({
+      type: row._type === 'income' ? t('common.income') : t('common.expense'),
+      date: row._date || '',
+      description: row.description || '',
+      category: row._type === 'expense' ? (row.category_id ? catMap[row.category_id]?.name || '' : t('transactions.uncategorized')) : '',
+      amount: row.amount,
+      currency: row.currency,
+      methodOrSource: row._type === 'expense'
+        ? (PAYMENT_METHODS.find((m) => m.value === row.payment_method)?.label || row.payment_method)
+        : (incomeSources.find((s) => s.value === row.source)?.label || row.source),
+      notes: row.notes || '',
+      reconciled: row.reconciled ? t('transactions.csvReconciled') : '',
+    }));
+    downloadCsv(`transactions-${todayStr()}.csv`, columns, rows);
   };
 
   if (loading) return <PageSkeleton />;
@@ -395,16 +506,74 @@ export default function Transactions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-heading font-semibold tracking-tight">{t('transactions.title')}</h1>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-1" /> {t('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => navigate('/income/new')}>{t('common.income')}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>{t('common.expense')}</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="w-4 h-4 mr-1" /> {t('transactions.exportCsv')}
+          </Button>
+          <Button variant={selectMode ? 'secondary' : 'outline'} onClick={toggleSelectMode}>
+            {selectMode ? <X className="w-4 h-4 mr-1" /> : <ListChecks className="w-4 h-4 mr-1" />}
+            {selectMode ? t('transactions.cancelSelect') : t('transactions.select')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-1" /> {t('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => navigate('/income/new')}>{t('common.income')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/expenses/new')}>{t('common.expense')}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      {selectMode && (
+        <Card className="p-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium tabular-nums">
+              {selected.size === 1 ? t('transactions.selectedCountOne', { count: 1 }) : t('transactions.selectedCountOther', { count: selected.size })}
+            </p>
+            <Button variant="ghost" size="sm" onClick={selectAllFiltered}>{t('transactions.selectAll')}</Button>
+            {selected.size > 0 && <Button variant="ghost" size="sm" onClick={clearSelection}>{t('common.cancel')}</Button>}
+          </div>
+          {selected.size > 0 && (
+            <div className="flex items-center gap-2">
+              {selectedRows.some((r) => r._type === 'expense') && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm"><Tags className="w-4 h-4 mr-1" /> {t('transactions.bulkRecategorize')}</Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-1" align="end">
+                    <div className="max-h-72 overflow-y-auto space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => bulkRecategorize(null)}
+                        className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                      >
+                        <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color="#94a3b8" className="w-6 h-6" />
+                        {t('transactions.uncategorized')}
+                      </button>
+                      {flattenCategoryTree(categories).map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => bulkRecategorize(c.id)}
+                          className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}`}
+                        >
+                          <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-6 h-6" />
+                          {c.depth > 0 ? '↳ ' : ''}{c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash2 className="w-4 h-4 mr-1" /> {t('transactions.bulkDelete')}
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card className="p-3 space-y-2">
         {customRangeOpen ? (
@@ -539,33 +708,38 @@ export default function Transactions() {
               isOpen={!!expanded[row.id]}
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
               onCopy={() => copyRow(row)}
-              onDelete={() => setDeleteTarget(row)}
+              onDelete={() => deleteRow(row)}
               onToggleReconciled={() => toggleReconciled(row)}
+              selectMode={selectMode}
+              selected={selected.has(selectionKey(row))}
+              onToggleSelect={() => toggleSelect(row)}
             />
           ) : (
             <IncomeRow
               key={row.id}
               i={row}
               onCopy={() => copyRow(row)}
-              onDelete={() => setDeleteTarget(row)}
+              onDelete={() => deleteRow(row)}
               onToggleReconciled={() => toggleReconciled(row)}
+              selectMode={selectMode}
+              selected={selected.has(selectionKey(row))}
+              onToggleSelect={() => toggleSelect(row)}
             />
           )
         )}
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('transactions.deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget && t('transactions.deleteDescription', { description: deleteTarget.description, amount: fmt(deleteTarget.amount, deleteTarget.currency) })}
-              {t('transactions.cannotUndo')}
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {selected.size === 1 ? t('transactions.bulkDeleteConfirmTitleOne') : t('transactions.bulkDeleteConfirmTitleOther', { count: selected.size })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t('transactions.bulkDeleteConfirmBody')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: 'destructive' })}>
+            <AlertDialogAction onClick={bulkDelete} className={buttonVariants({ variant: 'destructive' })}>
               {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
