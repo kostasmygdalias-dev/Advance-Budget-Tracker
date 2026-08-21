@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { startOfWeek, endOfWeek } from 'date-fns';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { entities, createBackupSnapshot, listBackupSnapshots } from '@/lib/sheetsStore';
+import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -279,34 +280,45 @@ export default function Dashboard() {
   const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [customizing, setCustomizing] = useState(false);
 
+  // Categories and Settings are cached across pages (see useEntities) —
+  // only expenses/incomes are fetched fresh here, since they change often
+  // and this page's own toasts/optimistic bits assume plain local state.
+  const catQuery = useCategoriesQuery();
+  const setQuery = useSettingsQuery();
+  const invalidateSettings = useInvalidateSettings();
+  const categories = catQuery.data || [];
+  const settings = setQuery.data?.[0] || null;
+  const loading = txLoading || catQuery.isLoading || setQuery.isLoading;
+  const loadError = txError || catQuery.error || setQuery.error;
+
   const load = () => {
-    setLoading(true);
-    setLoadError(null);
+    setTxLoading(true);
+    setTxError(null);
     (async () => {
       try {
-        const [exp, inc, cats, sets] = await Promise.all([
+        const [exp, inc] = await Promise.all([
           entities.Expense.list('-paid_date', 500),
           entities.Income.list('-received_date', 500),
-          entities.Category.list(),
-          entities.Settings.list(),
         ]);
         setExpenses(exp);
         setIncomes(inc);
-        setCategories(cats);
-        setSettings(sets[0] || null);
       } catch (err) {
-        setLoadError(err);
+        setTxError(err);
       } finally {
-        setLoading(false);
+        setTxLoading(false);
       }
     })();
+  };
+
+  const retryAll = () => {
+    load();
+    catQuery.refetch();
+    setQuery.refetch();
   };
 
   useEffect(load, []);
@@ -342,8 +354,8 @@ export default function Dashboard() {
     setLayout(next);
     if (!settings) return;
     try {
-      const updated = await entities.Settings.update(settings.id, { dashboard_layout: next });
-      setSettings(updated);
+      await entities.Settings.update(settings.id, { dashboard_layout: next });
+      invalidateSettings();
     } catch (err) {
       toast({ title: t('dashboard.couldNotSaveLayout'), description: err.message, variant: 'destructive' });
     }
@@ -500,7 +512,7 @@ export default function Dashboard() {
   }, [settings, loading, budgetPeriodExpenseTotal, budget, periodKey, currency]);
 
   if (loading) return <PageSkeleton rows={4} />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loadError) return <LoadError error={loadError} onRetry={retryAll} />;
 
   const renderWidget = (id) => {
     switch (id) {

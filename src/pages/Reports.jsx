@@ -18,6 +18,7 @@ import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
+import { useCategoriesQuery, useSettingsQuery } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -65,41 +66,47 @@ export default function Reports() {
   const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
+  const catQuery = useCategoriesQuery();
+  const setQuery = useSettingsQuery();
+  const categories = catQuery.data || [];
+  const settings = setQuery.data?.[0] || null;
+  const loading = txLoading || catQuery.isLoading || setQuery.isLoading;
+  const loadError = txError || catQuery.error || setQuery.error;
   const [fromMonth, setFromMonth] = useState(getRecentMonths(6)[0]);
   const [toMonth, setToMonth] = useState(currentMonthStr());
   const [focusCategoryId, setFocusCategoryId] = useState('all');
 
   const load = () => {
-    setLoading(true);
-    setLoadError(null);
+    setTxLoading(true);
+    setTxError(null);
     (async () => {
       try {
-        const [exp, inc, cats, sets] = await Promise.all([
+        const [exp, inc] = await Promise.all([
           entities.Expense.list('-paid_date', 500),
           entities.Income.list('-received_date', 500),
-          entities.Category.list(),
-          entities.Settings.list(),
         ]);
         setExpenses(exp);
         setIncomes(inc);
-        setCategories(cats);
-        setSettings(sets[0] || null);
       } catch (err) {
-        setLoadError(err);
+        setTxError(err);
       } finally {
-        setLoading(false);
+        setTxLoading(false);
       }
     })();
+  };
+
+  const retryAll = () => {
+    load();
+    catQuery.refetch();
+    setQuery.refetch();
   };
 
   useEffect(load, []);
 
   if (loading) return <PageSkeleton rows={4} />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loadError) return <LoadError error={loadError} onRetry={retryAll} />;
 
   const catMap = {};
   categories.forEach((c) => { catMap[c.id] = c; });

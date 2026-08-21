@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { calculateAmortizationSchedule } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
+import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
 import { CATEGORY_ICON_NAMES } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
@@ -47,6 +48,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   const { t } = useLanguage();
   const PAYMENT_METHODS = getPaymentMethods(t);
   const UNITS = getUnits(t);
+  const invalidateCategories = useInvalidateCategories();
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
@@ -110,6 +112,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
       set('category_id', created.id);
       setNewCategoryName('');
       setCreatingCategory(false);
+      invalidateCategories();
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     } finally {

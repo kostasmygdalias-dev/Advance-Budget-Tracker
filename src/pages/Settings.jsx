@@ -14,6 +14,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { openBillingPortal } from '@/lib/subscription';
 import { parseCsv } from '@/lib/csv';
 import { downloadJson } from '@/lib/exportFile';
+import { useInvalidateSettings } from '@/hooks/useEntities';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
@@ -36,6 +37,7 @@ export default function Settings() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const invalidateSettings = useInvalidateSettings();
 
   const loadBackups = () => {
     setBackupsLoading(true);
@@ -101,6 +103,7 @@ export default function Settings() {
             budget_per_category: {},
           });
           setSettings(created);
+          invalidateSettings();
         }
         setCategories(cats);
       } catch (err) {
@@ -122,6 +125,7 @@ export default function Settings() {
         default_currency: settings.default_currency,
         budget_period: settings.budget_period || 'monthly',
       });
+      invalidateSettings();
       toast({ title: t('settings.settingsSaved') });
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });

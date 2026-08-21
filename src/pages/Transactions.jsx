@@ -27,6 +27,7 @@ import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
+import { useCategoriesQuery } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -207,9 +208,12 @@ export default function Transactions() {
 
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
+  const catQuery = useCategoriesQuery();
+  const categories = catQuery.data || [];
+  const loading = txLoading || catQuery.isLoading;
+  const loadError = txError || catQuery.error;
   const [expanded, setExpanded] = useState({});
   const [type, setType] = useState(initialType);
   const [month, setMonth] = useState(initialMonth);
@@ -230,24 +234,27 @@ export default function Transactions() {
   };
 
   const load = () => {
-    setLoading(true);
-    setLoadError(null);
+    setTxLoading(true);
+    setTxError(null);
     (async () => {
       try {
-        const [exp, inc, cats] = await Promise.all([
+        const [exp, inc] = await Promise.all([
           entities.Expense.list('-paid_date', 500),
           entities.Income.list('-received_date', 500),
-          entities.Category.list(),
         ]);
         setExpenses(exp);
         setIncomes(inc);
-        setCategories(cats);
       } catch (err) {
-        setLoadError(err);
+        setTxError(err);
       } finally {
-        setLoading(false);
+        setTxLoading(false);
       }
     })();
+  };
+
+  const retryAll = () => {
+    load();
+    catQuery.refetch();
   };
 
   useEffect(load, []);
@@ -500,7 +507,7 @@ export default function Transactions() {
   };
 
   if (loading) return <PageSkeleton />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loadError) return <LoadError error={loadError} onRetry={retryAll} />;
 
   return (
     <div className="space-y-6">

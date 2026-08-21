@@ -13,6 +13,7 @@ import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { guessIconForName } from '@/lib/categoryIconGuess';
+import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
 
 const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -60,6 +61,7 @@ export default function Categories() {
   const [colorTouched, setColorTouched] = useState(false);
   const [iconTouched, setIconTouched] = useState(false);
   const [addingDefaults, setAddingDefaults] = useState(false);
+  const invalidateCategories = useInvalidateCategories();
 
   const load = () => {
     setLoading(true);
@@ -123,6 +125,7 @@ export default function Categories() {
       }
       setEditing(null);
       load();
+      invalidateCategories();
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
     }
@@ -131,12 +134,14 @@ export default function Categories() {
   const remove = async (c) => {
     await entities.Category.delete(c.id);
     load();
+    invalidateCategories();
   };
 
   const changeIcon = async (c, icon) => {
     setCategories((prev) => prev.map((row) => (row.id === c.id ? { ...row, icon } : row)));
     try {
       await entities.Category.update(c.id, { icon });
+      invalidateCategories();
     } catch (err) {
       setCategories((prev) => prev.map((row) => (row.id === c.id ? { ...row, icon: c.icon } : row)));
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
@@ -148,6 +153,7 @@ export default function Categories() {
     try {
       const added = await addMissingDefaultCategories();
       load();
+      invalidateCategories();
       toast({
         title: added === 0
           ? t('categories.allDefaultsExist')
@@ -176,6 +182,7 @@ export default function Categories() {
     await Promise.all(
       reordered.map((c, i) => (c.sort_order === i ? null : entities.Category.update(c.id, { sort_order: i })))
     );
+    invalidateCategories();
   };
 
   if (loading) return <PageSkeleton />;
