@@ -193,6 +193,9 @@ export const en = {
     csvMethodOrSource: 'Method / Source',
     csvNotes: 'Notes',
     csvReconciled: 'Reconciled',
+    editTransaction: 'Edit "{{description}}"',
+    copyTransaction: 'Duplicate "{{description}}"',
+    deleteTransaction: 'Delete "{{description}}"',
   },
 
   recurring: {

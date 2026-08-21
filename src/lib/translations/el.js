@@ -193,6 +193,9 @@ export const el = {
     csvMethodOrSource: 'Μέθοδος / Πηγή',
     csvNotes: 'Σημειώσεις',
     csvReconciled: 'Συμφωνημένο',
+    editTransaction: 'Επεξεργασία «{{description}}»',
+    copyTransaction: 'Αντιγραφή «{{description}}»',
+    deleteTransaction: 'Διαγραφή «{{description}}»',
   },
 
   recurring: {

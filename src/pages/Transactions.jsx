@@ -137,10 +137,10 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
           <p className="font-semibold tabular-nums">{fmt(e.amount, e.currency)}</p>
         </div>
         <Link to={`/expenses/${e.id}/edit`}>
-          <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: e.description })}><Pencil className="w-4 h-4" /></Button>
         </Link>
-        <Button variant="ghost" size="icon" onClick={onCopy}><Copy className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: e.description })}><Copy className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: e.description })}><Trash2 className="w-4 h-4" /></Button>
       </div>
       {e.expense_type === 'amortized' && isOpen && (e.amortization_schedule || []).length > 0 && (
         <div className="border-t bg-muted/30 p-4">
@@ -185,10 +185,10 @@ function IncomeRow({ i, onCopy, onDelete, onToggleReconciled, selectMode, select
           <p className="font-semibold tabular-nums text-emerald-600">+{fmt(i.amount, i.currency)}</p>
         </div>
         <Link to={`/income/${i.id}/edit`}>
-          <Button variant="ghost" size="icon"><Pencil className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: i.description })}><Pencil className="w-4 h-4" /></Button>
         </Link>
-        <Button variant="ghost" size="icon" onClick={onCopy}><Copy className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: i.description })}><Copy className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: i.description })}><Trash2 className="w-4 h-4" /></Button>
       </div>
     </Card>
   );
