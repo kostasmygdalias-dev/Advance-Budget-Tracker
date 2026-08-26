@@ -90,13 +90,45 @@ async function handleSheetsRequest(route, workbook) {
   return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: `Unhandled mock request: ${method} ${pathname}` }) });
 }
 
+// Fakes the billing Worker at VITE_SUBSCRIPTION_API_URL (see
+// playwright.config.js — https://billing.test in tests). Defaults to an
+// active subscription and a disconnected Viber bot, the least surprising
+// starting point; pass `viberStatus` to test the other states (see
+// src/lib/subscription.js's getViberStatus() for the {connected,
+// hasGoogleAuth} shape). `startViberConnect()`'s actual OAuth redirect is
+// never exercised here — it's a real navigation to accounts.google.com,
+// out of scope for this mock; tests instead jump straight to the
+// post-redirect state via a `?viber_link=CODE` URL, same as the real
+// Worker callback would land the browser on.
+function installBillingMocks(page, { viberStatus = { connected: false, hasGoogleAuth: false } } = {}) {
+  return page.route('https://billing.test/**', (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/subscription-status') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ active: true, status: 'active' }) });
+    }
+    if (pathname === '/viber/status') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(viberStatus) });
+    }
+    if (pathname === '/viber/relink' && request.method() === 'POST') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'ABC123' }) });
+    }
+    if (pathname === '/viber/unlink' && request.method() === 'POST') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
+    }
+    return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: `Unhandled billing mock request: ${request.method()} ${pathname}` }) });
+  });
+}
+
 // Installs every route mock needed for a fully signed-in session. Call
 // before navigating. `seed` optionally pre-populates tabs as if the
 // spreadsheet already existed (e.g. { Categories: [header, ...rows] }) —
 // otherwise the app creates a fresh one on first load, exactly like a
 // brand-new account (including the real default category taxonomy, since
 // that seeding logic lives in the app itself and isn't reproduced here).
-export async function installGoogleApiMocks(page, { seed } = {}) {
+// `viberStatus` is passed straight through to installBillingMocks().
+export async function installGoogleApiMocks(page, { seed, viberStatus } = {}) {
+  await installBillingMocks(page, { viberStatus });
   const workbook = makeWorkbook();
   if (seed) {
     workbook.created = true;

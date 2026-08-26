@@ -431,7 +431,7 @@ export const en = {
   settings: {
     title: 'Settings',
     signedInAs: 'Signed in as {{email}}',
-    dataNotice: 'All your data — expenses, categories, recurring templates, and these settings — lives in a spreadsheet named "ExpenseTrack Data" in your own Google Drive. Nobody else, including this app, keeps a separate copy.',
+    dataNotice: 'All your data — expenses, categories, recurring templates, and these settings — lives in a spreadsheet named "ExpenseTrack Data" in your own Google Drive. Nobody else, including this app, keeps a separate copy. You can install this app to your home screen, but it isn’t offline-capable — every screen reads live from that spreadsheet, so you’ll still need an internet connection.',
     proPlan: 'Pro plan',
     freePlan: 'Free plan',
     recurringUnlocked: 'Recurring templates unlocked',

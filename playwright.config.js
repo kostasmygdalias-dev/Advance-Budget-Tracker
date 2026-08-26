@@ -20,6 +20,14 @@ export default defineConfig({
       // mocked in tests/mocks/googleApi.js, so this is never used to talk
       // to Google, only to satisfy googleAuth.js's "is this configured" check.
       VITE_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
+      // Also fake-but-configured, so billingConfigured is true and the
+      // Pro/Viber UI in Settings.jsx and Recurring.jsx actually renders in
+      // tests instead of being permanently skipped. Every call to this host
+      // is mocked in tests/mocks/googleApi.js's installBillingMocks(),
+      // defaulting subscription status to active — the same outcome as the
+      // real "not configured" fail-open default, so existing tests are
+      // unaffected unless they explicitly override it.
+      VITE_SUBSCRIPTION_API_URL: 'https://billing.test',
     },
     timeout: 60_000,
   },
