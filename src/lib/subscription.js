@@ -85,12 +85,25 @@ export function startViberConnect() {
   url.searchParams.set('scope', scope);
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
+  // Echoed back verbatim on the Worker's /oauth/callback redirect so it
+  // knows which origin to send the browser back to (this app can be
+  // reached from more than one — production and localhost during dev).
+  url.searchParams.set('state', window.location.origin);
   window.location.href = url.toString();
 }
 
+// { connected, hasGoogleAuth } — hasGoogleAuth true + connected false means
+// the OAuth step finished but "/link CODE" to the bot never completed (or
+// the code expired since); see getViberRelinkCode().
 export async function getViberStatus() {
-  if (!isBillingConfigured()) return { connected: false };
+  if (!isBillingConfigured()) return { connected: false, hasGoogleAuth: false };
   return authedFetch('/viber/status');
+}
+
+// Mints a fresh link code without repeating the Google consent screen —
+// only works once startViberConnect() has completed at least once.
+export async function getViberRelinkCode() {
+  return authedFetch('/viber/relink', { method: 'POST' });
 }
 
 export async function disconnectViber() {

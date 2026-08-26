@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { entities, createBackupSnapshot, listBackupSnapshots, getBackupSnapshotJson } from '@/lib/sheetsStore';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wal
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
-import { openBillingPortal, startViberConnect, getViberStatus, disconnectViber } from '@/lib/subscription';
+import { openBillingPortal, startViberConnect, getViberStatus, getViberRelinkCode, disconnectViber } from '@/lib/subscription';
 import { parseCsv } from '@/lib/csv';
 import { downloadJson } from '@/lib/exportFile';
 import { useInvalidateSettings } from '@/hooks/useEntities';
@@ -37,8 +37,10 @@ export default function Settings() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
-  const [viberConnected, setViberConnected] = useState(null); // null = checking
+  const [viberStatus, setViberStatus] = useState(null); // { connected, hasGoogleAuth } | null = checking
   const [viberBusy, setViberBusy] = useState(false);
+  const [viberLinkCode, setViberLinkCode] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const invalidateSettings = useInvalidateSettings();
 
   const loadBackups = () => {
@@ -88,14 +90,53 @@ export default function Settings() {
 
   useEffect(() => {
     if (!subActive) return;
-    getViberStatus().then((s) => setViberConnected(s.connected)).catch(() => setViberConnected(false));
+    getViberStatus().then(setViberStatus).catch(() => setViberStatus({ connected: false, hasGoogleAuth: false }));
   }, [subActive]);
+
+  // Handles landing back here after the Worker's /oauth/callback redirect —
+  // ?viber_link=CODE on success, ?viber_error=... on failure — then strips
+  // both from the URL so refreshing doesn't re-show them.
+  useEffect(() => {
+    const link = searchParams.get('viber_link');
+    const error = searchParams.get('viber_error');
+    if (link) {
+      setViberLinkCode(link);
+      setViberStatus((s) => ({ ...(s || {}), hasGoogleAuth: true }));
+    }
+    if (error) {
+      const messages = {
+        cancelled: t('settings.viberErrorCancelled'),
+        not_pro: t('settings.viberErrorNotPro'),
+        no_refresh_token: t('settings.viberErrorNoRefresh'),
+      };
+      toast({ title: t('settings.viberErrorTitle'), description: messages[error] || t('settings.viberErrorGeneric'), variant: 'destructive' });
+    }
+    if (link || error) {
+      searchParams.delete('viber_link');
+      searchParams.delete('viber_error');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // Only ever meant to run once, against whatever params the page loaded with.
+  }, []);
+
+  const getNewViberCode = async () => {
+    setViberBusy(true);
+    try {
+      const { code } = await getViberRelinkCode();
+      setViberLinkCode(code);
+    } catch (err) {
+      toast({ title: t('common.couldNotUpdate'), description: err.message, variant: 'destructive' });
+    } finally {
+      setViberBusy(false);
+    }
+  };
 
   const disconnectViberNow = async () => {
     setViberBusy(true);
     try {
       await disconnectViber();
-      setViberConnected(false);
+      setViberStatus({ connected: false, hasGoogleAuth: false });
+      setViberLinkCode(null);
       toast({ title: t('settings.viberDisconnected') });
     } catch (err) {
       toast({ title: t('common.couldNotUpdate'), description: err.message, variant: 'destructive' });
@@ -263,8 +304,8 @@ export default function Settings() {
       {billingConfigured && !subLoading && (
         <Card className="p-5 space-y-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${viberConnected ? 'bg-primary' : 'bg-muted'}`}>
-              <MessageCircle className={`w-5 h-5 ${viberConnected ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${viberStatus?.connected ? 'bg-primary' : 'bg-muted'}`}>
+              <MessageCircle className={`w-5 h-5 ${viberStatus?.connected ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
             </div>
             <div>
               <p className="text-sm font-medium flex items-center gap-2">
@@ -276,15 +317,28 @@ export default function Settings() {
               <p className="text-xs text-muted-foreground">
                 {!subActive
                   ? t('settings.viberProOnly')
-                  : viberConnected ? t('settings.viberConnectedDesc') : t('settings.viberNotConnectedDesc')}
+                  : viberStatus?.connected ? t('settings.viberConnectedDesc') : t('settings.viberNotConnectedDesc')}
               </p>
             </div>
           </div>
+
+          {subActive && viberLinkCode && (
+            <div className="rounded-lg bg-muted p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">{t('settings.viberCodeInstructions')}</p>
+              <code className="block text-lg font-semibold tracking-wide">/link {viberLinkCode}</code>
+              <p className="text-xs text-muted-foreground">{t('settings.viberCodeExpiry')}</p>
+            </div>
+          )}
+
           {subActive ? (
-            viberConnected !== null && (
-              viberConnected ? (
+            viberStatus && (
+              viberStatus.connected ? (
                 <Button variant="outline" onClick={disconnectViberNow} disabled={viberBusy}>
                   {viberBusy ? t('settings.disconnecting') : t('settings.disconnectViber')}
+                </Button>
+              ) : viberStatus.hasGoogleAuth ? (
+                <Button onClick={getNewViberCode} disabled={viberBusy}>
+                  {viberBusy ? t('settings.opening') : t('settings.getNewViberCode')}
                 </Button>
               ) : (
                 <Button onClick={startViberConnect}>{t('settings.connectViber')}</Button>

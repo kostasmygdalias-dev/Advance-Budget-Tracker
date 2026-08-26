@@ -51,8 +51,7 @@ async function handlePortalSession(request, env, cors) {
   if (!sub?.stripeCustomerId) return json({ error: 'No subscription found for this account' }, 400, cors);
 
   const body = await request.json().catch(() => ({}));
-  const allowedOrigins = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const returnUrl = body.returnUrl || allowedOrigins[0] || '';
+  const returnUrl = body.returnUrl || allowedOriginsList(env)[0] || '';
 
   const session = await stripeRequest(env, 'billing_portal/sessions', {
     customer: sub.stripeCustomerId,
@@ -101,55 +100,78 @@ async function handleWebhook(request, env, cors) {
   return json({ received: true }, 200, cors);
 }
 
-function htmlPage(bodyHtml) {
-  return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ExpenseTrack</title>
-    <style>body{font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;text-align:center;color:#0f172a}
-    code{background:#f1f5f9;padding:4px 10px;border-radius:6px;display:inline-block;margin:8px 0}</style>
-    </head><body>${bodyHtml}</body></html>`,
-    { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-  );
+function allowedOriginsList(env) {
+  return (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+// `state` round-trips through Google unmodified, so it's attacker-influenceable
+// (a crafted initial link could set it) — only ever redirect to a value that
+// exactly matches a configured origin, never to `state` verbatim, or this
+// becomes an open redirect immediately after a real Google auth.
+function resolveReturnOrigin(env, state) {
+  const allowed = allowedOriginsList(env);
+  return allowed.includes(state) ? state : (allowed[0] || '');
+}
+
+function redirectTo(url) {
+  return new Response(null, { status: 302, headers: { Location: url } });
 }
 
 // Google redirects the browser here after the user approves offline access
-// (see the "Connect Viber" button in Settings.jsx). This is the one place
-// a refresh token is minted and stored — see googleOAuth.js's header
-// comment for why the Viber bot needs one at all.
+// (see startViberConnect() in subscription.js). This is the one place a
+// refresh token is minted and stored — see googleOAuth.js's header comment
+// for why the Viber bot needs one at all. Always ends by redirecting back
+// into the app's Settings page (not a page hosted on this Worker) — either
+// with ?viber_link=CODE on success or ?viber_error=... on failure, so the
+// app can render the outcome in its own UI instead of a bare Worker page.
 async function handleOAuthCallback(request, env) {
   const url = new URL(request.url);
+  const returnOrigin = resolveReturnOrigin(env, url.searchParams.get('state'));
+  const back = (params) => redirectTo(`${returnOrigin}/#/settings?${new URLSearchParams(params).toString()}`);
+
   const err = url.searchParams.get('error');
-  if (err) return htmlPage(`<h2>Connection cancelled</h2><p>(${err}) You can close this tab and try again from Settings.</p>`);
+  if (err) return back({ viber_error: 'cancelled' });
 
   const code = url.searchParams.get('code');
-  if (!code) return htmlPage('<h2>Missing authorization code</h2><p>Close this tab and try again from Settings.</p>');
+  if (!code) return back({ viber_error: 'missing_code' });
 
   let tokens;
   try {
     tokens = await exchangeCodeForTokens(env, code, `${url.origin}/oauth/callback`);
-  } catch (e) {
-    return htmlPage(`<h2>Could not complete the connection</h2><p>${e.message}</p>`);
+  } catch {
+    return back({ viber_error: 'exchange_failed' });
   }
   if (!tokens.refresh_token) {
-    return htmlPage(
-      "<h2>Almost there</h2><p>Google didn't grant offline access this time — this usually happens if you've connected before. "
-      + "Open your Google Account's <strong>Third-party apps &amp; services</strong> page, remove ExpenseTrack's access, then try Connect Viber again.</p>",
-    );
+    // Usually means they'd already granted offline access before, and
+    // Google only issues a refresh token on first consent (or with
+    // prompt=consent forcing re-consent) — see startViberConnect().
+    return back({ viber_error: 'no_refresh_token' });
   }
 
   const user = await fetchGoogleUserInfo(tokens.access_token);
-  if (!user.sub) return htmlPage('<h2>Could not identify your Google account</h2><p>Close this tab and try again.</p>');
+  if (!user.sub) return back({ viber_error: 'no_identity' });
 
   const subscription = await getSubscription(env, user.sub);
-  if (subscription?.status !== 'active') {
-    return htmlPage('<h2>Pro feature</h2><p>The Viber bot requires an active subscription — upgrade in the app, then try Connect Viber again.</p>');
-  }
+  if (subscription?.status !== 'active') return back({ viber_error: 'not_pro' });
 
   await setRefreshToken(env, user.sub, tokens.refresh_token);
   const linkCode = await createLinkCode(env, user.sub);
-  return htmlPage(
-    `<h2>Connected!</h2><p>Open Viber, find the ExpenseTrack bot, and send:</p><code>/link ${linkCode}</code><p>This code expires in 15 minutes.</p>`,
-  );
+  return back({ viber_link: linkCode });
+}
+
+// A link code is only good for 15 minutes; this mints a fresh one for an
+// account that already completed the Google OAuth step (has a stored
+// refresh token) without making them click through Google's consent screen
+// again just because they didn't paste the code into Viber in time.
+async function handleViberRelink(request, env, cors) {
+  const user = await verifyGoogleUser(request);
+  if (!user) return json({ error: 'Unauthorized' }, 401, cors);
+  const subscription = await getSubscription(env, user.sub);
+  if (subscription?.status !== 'active') return json({ error: 'Pro subscription required' }, 403, cors);
+  const refreshToken = await getRefreshToken(env, user.sub);
+  if (!refreshToken) return json({ error: 'not_connected' }, 400, cors);
+  const linkCode = await createLinkCode(env, user.sub);
+  return json({ code: linkCode }, 200, cors);
 }
 
 // Viber POSTs every bot event here. Must respond quickly — actual work is
@@ -171,8 +193,14 @@ async function handleViberWebhook(request, env, cors) {
 async function handleViberStatus(request, env, cors) {
   const user = await verifyGoogleUser(request);
   if (!user) return json({ error: 'Unauthorized' }, 401, cors);
-  const viberUserId = await getViberUserForSub(env, user.sub);
-  return json({ connected: !!viberUserId }, 200, cors);
+  const [viberUserId, refreshToken] = await Promise.all([
+    getViberUserForSub(env, user.sub),
+    getRefreshToken(env, user.sub),
+  ]);
+  // hasGoogleAuth without connected means the OAuth step is done but the
+  // "/link CODE" message to the bot never completed (or the code expired)
+  // — Settings.jsx offers "get a new code" instead of "connect" in that case.
+  return json({ connected: !!viberUserId, hasGoogleAuth: !!refreshToken }, 200, cors);
 }
 
 async function handleViberUnlink(request, env, cors) {
@@ -212,6 +240,9 @@ export default {
       }
       if (url.pathname === '/viber/status' && request.method === 'GET') {
         return await handleViberStatus(request, env, cors);
+      }
+      if (url.pathname === '/viber/relink' && request.method === 'POST') {
+        return await handleViberRelink(request, env, cors);
       }
       if (url.pathname === '/viber/unlink' && request.method === 'POST') {
         return await handleViberUnlink(request, env, cors);

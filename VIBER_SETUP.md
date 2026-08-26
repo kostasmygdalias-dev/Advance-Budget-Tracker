@@ -106,8 +106,8 @@ OAuth and webhook URLs above — no new env var.
    you should see a new "Add/remove expenses via Viber" card with a
    **Connect Viber** button.
 2. Click it → Google's consent screen (this time asking for offline
-   access) → approve → you land back on a plain confirmation page showing a
-   6-character code and `/link CODE`.
+   access) → approve → you land back on **Settings in the app itself**
+   (not a separate page) showing a 6-character code and `/link CODE`.
 3. Open Viber, find your bot (search the name from Part B), start a chat,
    send exactly what the page showed: `/link ABCDEF`.
 4. The bot should reply confirming the connection. Try:
@@ -121,6 +121,10 @@ OAuth and webhook URLs above — no new env var.
 
 ## Known limitations (by design, not bugs)
 
+- **Link codes expire after 15 minutes.** If you don't get `/link CODE` sent
+  in time, Settings shows a **"Get new link code"** button instead of
+  Connect once the Google step is done — no need to repeat the consent
+  screen.
 - **One Viber account per Google account.** Connecting again overwrites the
   previous link.
 - **"Remove" always targets the single most recent match** (most recent
