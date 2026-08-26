@@ -328,6 +328,7 @@ export const en = {
     noSpendingInRange: 'No spending in this range.',
     allCategories: 'All categories',
     categoriesSelected: '{{count}} categories selected',
+    clearSelection: 'Clear selection',
     spendingTrend: 'Spending trend',
     noSubcategorySpending: 'No spending in its subcategories in this range.',
     incomeBySource: 'Income by source',

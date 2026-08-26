@@ -328,6 +328,7 @@ export const el = {
     noSpendingInRange: 'Δεν υπάρχουν δαπάνες σε αυτό το εύρος.',
     allCategories: 'Όλες οι κατηγορίες',
     categoriesSelected: '{{count}} κατηγορίες επιλεγμένες',
+    clearSelection: 'Καθαρισμός επιλογής',
     spendingTrend: 'Τάση δαπανών',
     noSubcategorySpending: 'Δεν υπάρχουν δαπάνες στις υποκατηγορίες της σε αυτό το εύρος.',
     incomeBySource: 'Έσοδα ανά πηγή',

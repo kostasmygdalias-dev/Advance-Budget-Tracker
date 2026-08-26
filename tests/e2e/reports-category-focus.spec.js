@@ -51,4 +51,10 @@ test('Reports category focus combines a parent and its own child without double-
   await expect(fuelRow.getByText('30.00 EUR')).toBeVisible();
   const parkingRow = spendingCard.locator('div.flex.items-center.gap-3', { has: page.getByText('Parking', { exact: true }) });
   await expect(parkingRow.getByText('20.00 EUR')).toBeVisible();
+
+  // The standalone reset button (next to the trigger, no popover needed)
+  // clears the selection back to "All categories".
+  await spendingCard.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(spendingCard.getByRole('button', { name: 'All categories' })).toBeVisible();
+  await expect(spendingCard.getByRole('button', { name: 'Clear selection' })).toHaveCount(0);
 });

@@ -11,7 +11,7 @@ import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { Download, Printer, ChevronDown } from 'lucide-react';
+import { Download, Printer, ChevronDown, X } from 'lucide-react';
 import {
   getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths,
 } from '@/lib/finance';
@@ -79,34 +79,44 @@ function CategoryMultiSelect({ categoryReport, selectedIds, onToggle, onClear, t
       ? selectedEntries[0]?.name
       : t('reports.categoriesSelected', { count: selectedIds.length });
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 text-xs w-48 justify-between font-normal">
-          <span className="truncate">{label}</span>
-          <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-1" align="end">
-        <div className="max-h-72 overflow-y-auto space-y-0.5">
-          <button
-            type="button"
-            onClick={() => { onClear(); setOpen(false); }}
-            className={`w-full flex items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${selectedIds.length === 0 ? 'font-medium' : ''}`}
-          >
-            {t('reports.allCategories')}
-          </button>
-          {flatEntries.map((c) => (
-            <label
-              key={c.id}
-              className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors cursor-pointer ${c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}`}
+    <div className="flex items-center gap-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 text-xs w-48 justify-between font-normal">
+            <span className="truncate">{label}</span>
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-60" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-1" align="end">
+          <div className="max-h-72 overflow-y-auto space-y-0.5">
+            <button
+              type="button"
+              onClick={() => { onClear(); setOpen(false); }}
+              className={`w-full flex items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${selectedIds.length === 0 ? 'font-medium' : ''}`}
             >
-              <Checkbox checked={selectedIds.includes(c.id)} onCheckedChange={() => onToggle(c.id)} />
-              <span className="truncate">{c.depth > 0 ? '↳ ' : ''}{c.name}</span>
-            </label>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
+              {t('reports.allCategories')}
+            </button>
+            {flatEntries.map((c) => (
+              <label
+                key={c.id}
+                className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors cursor-pointer ${c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}`}
+              >
+                <Checkbox checked={selectedIds.includes(c.id)} onCheckedChange={() => onToggle(c.id)} />
+                <span className="truncate">{c.depth > 0 ? '↳ ' : ''}{c.name}</span>
+              </label>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {selectedIds.length > 0 && (
+        <Button
+          variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+          onClick={onClear} aria-label={t('reports.clearSelection')} title={t('reports.clearSelection')}
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      )}
+    </div>
   );
 }
 
