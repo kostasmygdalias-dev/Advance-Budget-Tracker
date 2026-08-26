@@ -38,5 +38,7 @@ test('Settings can disconnect an already-connected Viber bot', async ({ page }) 
 
   await disconnectButton.click();
   await expect(page.getByRole('button', { name: 'Connect Viber' })).toBeVisible();
-  await expect(page.getByText('Viber disconnected')).toBeVisible();
+  // The toast's own text is also mirrored into an aria-live announcer
+  // region, so scope to the visible toast body rather than matching both.
+  await expect(page.locator('[role="status"]', { hasText: 'Viber disconnected' }).first()).toBeVisible();
 });

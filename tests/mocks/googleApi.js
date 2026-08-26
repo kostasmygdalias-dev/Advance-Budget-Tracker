@@ -95,17 +95,18 @@ async function handleSheetsRequest(route, workbook) {
 // active subscription and a disconnected Viber bot, the least surprising
 // starting point; pass `viberStatus` to test the other states (see
 // src/lib/subscription.js's getViberStatus() for the {connected,
-// hasGoogleAuth} shape). `startViberConnect()`'s actual OAuth redirect is
-// never exercised here — it's a real navigation to accounts.google.com,
+// hasGoogleAuth} shape), or `subscriptionActive: false` to test a free
+// (non-Pro) account instead. `startViberConnect()`'s actual OAuth redirect
+// is never exercised here — it's a real navigation to accounts.google.com,
 // out of scope for this mock; tests instead jump straight to the
 // post-redirect state via a `?viber_link=CODE` URL, same as the real
 // Worker callback would land the browser on.
-function installBillingMocks(page, { viberStatus = { connected: false, hasGoogleAuth: false } } = {}) {
+function installBillingMocks(page, { viberStatus = { connected: false, hasGoogleAuth: false }, subscriptionActive = true } = {}) {
   return page.route('https://billing.test/**', (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     if (pathname === '/subscription-status') {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ active: true, status: 'active' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ active: subscriptionActive, status: subscriptionActive ? 'active' : 'inactive' }) });
     }
     if (pathname === '/viber/status') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(viberStatus) });
@@ -126,9 +127,10 @@ function installBillingMocks(page, { viberStatus = { connected: false, hasGoogle
 // otherwise the app creates a fresh one on first load, exactly like a
 // brand-new account (including the real default category taxonomy, since
 // that seeding logic lives in the app itself and isn't reproduced here).
-// `viberStatus` is passed straight through to installBillingMocks().
-export async function installGoogleApiMocks(page, { seed, viberStatus } = {}) {
-  await installBillingMocks(page, { viberStatus });
+// `viberStatus` and `subscriptionActive` are passed straight through to
+// installBillingMocks().
+export async function installGoogleApiMocks(page, { seed, viberStatus, subscriptionActive } = {}) {
+  await installBillingMocks(page, { viberStatus, subscriptionActive });
   const workbook = makeWorkbook();
   if (seed) {
     workbook.created = true;

@@ -4,6 +4,7 @@ import { startOfWeek, endOfWeek } from 'date-fns';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { entities, createBackupSnapshot, listBackupSnapshots } from '@/lib/sheetsStore';
 import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
+import { useSubscription } from '@/hooks/use-subscription';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -11,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from '@/components/ui/use-toast';
 import {
   Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag,
-  Receipt, FolderTree, PiggyBank, Wallet, Coins,
+  Receipt, FolderTree, PiggyBank, Wallet, Coins, Bell,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
@@ -34,6 +35,17 @@ const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 const AUTO_BACKUP_CHECK_KEY = 'expensetrack_last_auto_backup_check';
 const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const UPCOMING_RECURRING_WINDOW_DAYS = 7;
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86400000);
+}
 
 // Shown instead of the (otherwise all-empty) widget grid for a brand-new
 // account — a short, concrete "what to do first" instead of nine cards all
@@ -284,6 +296,16 @@ export default function Dashboard() {
   const [txError, setTxError] = useState(null);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [customizing, setCustomizing] = useState(false);
+  const { active: subActive } = useSubscription();
+  const [recurringTemplates, setRecurringTemplates] = useState([]);
+
+  // Recurring templates are a Pro feature on their own (see Recurring.jsx),
+  // so due-date reminders about them only make sense — and are only
+  // fetched — for an active subscriber.
+  useEffect(() => {
+    if (!subActive) return;
+    entities.RecurringTemplate.list().then(setRecurringTemplates).catch(() => {});
+  }, [subActive]);
 
   // Categories and Settings are cached across pages (see useEntities) —
   // only expenses/incomes are fetched fresh here, since they change often
@@ -400,6 +422,12 @@ export default function Dashboard() {
   const otherCurrencyCount =
     expenses.filter((e) => (e.currency || 'EUR') !== currency && getMonthlyContribution(e, thisMonth) > 0).length +
     incomes.filter((i) => (i.currency || 'EUR') !== currency && isInMonth(i.received_date, thisMonth)).length;
+
+  const upcomingRecurring = recurringTemplates
+    .filter((rt) => rt.active)
+    .map((rt) => ({ ...rt, daysUntil: daysUntil(rt.next_due_date) }))
+    .filter((rt) => rt.daysUntil !== null && rt.daysUntil >= 0 && rt.daysUntil <= UPCOMING_RECURRING_WINDOW_DAYS)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
 
   const recentTransactions = [
     ...expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date })),
@@ -705,6 +733,32 @@ export default function Dashboard() {
               <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
                 <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
               </Link>
+            </Card>
+          )}
+
+          {subActive && upcomingRecurring.length > 0 && (
+            <Card className="p-4 space-y-2">
+              <div className="flex items-center gap-3 text-primary">
+                <Bell className="w-5 h-5 shrink-0" />
+                <p className="text-sm font-medium text-foreground">
+                  {upcomingRecurring.length === 1
+                    ? t('dashboard.upcomingRecurringOne')
+                    : t('dashboard.upcomingRecurringOther', { count: upcomingRecurring.length })}
+                </p>
+              </div>
+              <div className="space-y-1 pl-8">
+                {upcomingRecurring.slice(0, 4).map((rt) => (
+                  <div key={rt.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate">{rt.description}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {rt.daysUntil === 0 ? t('dashboard.dueToday')
+                        : rt.daysUntil === 1 ? t('dashboard.dueTomorrow')
+                          : t('dashboard.dueInDays', { days: rt.daysUntil })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Link to="/recurring" className="text-xs text-muted-foreground underline pl-8 block">{t('dashboard.viewRecurring')}</Link>
             </Card>
           )}
 
