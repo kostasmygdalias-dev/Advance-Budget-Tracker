@@ -37,11 +37,34 @@ function toMonthStr(d) {
 }
 
 /**
- * Distribute `amount` evenly across the calendar months the period spans,
- * starting from paidDate. Returns [{ month: "YYYY-MM", amount }].
+ * Distribute `amount` across the period starting from paidDate. Returns
+ * [{ month: "YYYY-MM", amount }].
  */
 export function calculateAmortizationSchedule(paidDateStr, periodValue, periodUnit, amount) {
   if (!paidDateStr || !periodValue || !periodUnit || !amount) return [];
+
+  // Month/year periods split into that many *equal* calendar-month
+  // installments (60 over 6 months = 10, 10, 10, 10, 10, 10), starting the
+  // month it was paid — regardless of which day of that month it landed on.
+  // A day-weighted proration (below) would instead give each installment a
+  // different amount depending on how many days of each calendar month the
+  // period happens to touch, which isn't what "spread over 6 months" means
+  // for something like a 6-month insurance premium.
+  if (periodUnit === 'month' || periodUnit === 'year') {
+    const monthCount = Math.max(1, Math.round(periodUnit === 'year' ? periodValue * 12 : periodValue));
+    const perMonth = round2(amount / monthCount);
+    const start = parseDateLocal(paidDateStr);
+    const schedule = [];
+    for (let i = 0; i < monthCount; i++) {
+      schedule.push({ month: toMonthStr(addMonths(startOfMonth(start), i)), amount: perMonth });
+    }
+    const drift = round2(amount - schedule.reduce((s, e) => s + e.amount, 0));
+    schedule[schedule.length - 1].amount = round2(schedule[schedule.length - 1].amount + drift);
+    return schedule;
+  }
+
+  // Day/week periods don't map onto a whole number of months, so these stay
+  // proportional to how many days of each calendar month the period spans.
   const totalDays = periodToDays(periodValue, periodUnit);
   if (totalDays <= 0) return [];
 
