@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import CategoryMultiSelect from '@/components/CategoryMultiSelect';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -221,7 +222,8 @@ export default function Transactions() {
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [filters, setFilters] = useState({
-    search: '', category_id: searchParams.get('category') || 'all', payment_method: 'all', source: 'all',
+    search: '', category_ids: searchParams.get('category') ? [searchParams.get('category')] : [],
+    payment_method: 'all', source: 'all',
   });
   // An explicit alternative to month-browsing — either bound can be set
   // alone (open-ended) or both together. Takes over from `month` entirely
@@ -283,6 +285,11 @@ export default function Transactions() {
     return m;
   }, [categories]);
 
+  const categoryFilterEntries = useMemo(() => [
+    { id: 'uncategorized', name: t('transactions.uncategorized'), depth: 0 },
+    ...flattenCategoryTree(categories).map((c) => ({ id: c.id, name: c.name, depth: c.depth })),
+  ], [categories, t]);
+
   const combined = useMemo(() => {
     const exp = expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date }));
     const inc = incomes.map((i) => ({ ...i, _type: 'income', _date: i.received_date }));
@@ -291,13 +298,21 @@ export default function Transactions() {
 
   // Selecting a parent category rolls up to include its subcategories too —
   // otherwise "Transport" would only match transactions tagged to Transport
-  // itself, never Fuel/Parking underneath it.
+  // itself, never Fuel/Parking underneath it. Multiple categories/
+  // subcategories can be picked at once (see CategoryMultiSelect below), so
+  // this is a union across every selected id, plus a separate flag for
+  // "Uncategorized" since it isn't a real category to roll children into.
   const categoryFilterIds = useMemo(() => {
-    if (filters.category_id === 'all' || filters.category_id === 'uncategorized') return null;
-    const ids = new Set([filters.category_id]);
-    categories.forEach((c) => { if (c.parent_id === filters.category_id) ids.add(c.id); });
+    const realIds = filters.category_ids.filter((id) => id !== 'uncategorized');
+    if (realIds.length === 0) return null;
+    const ids = new Set();
+    realIds.forEach((id) => {
+      ids.add(id);
+      categories.forEach((c) => { if (c.parent_id === id) ids.add(c.id); });
+    });
     return ids;
-  }, [filters.category_id, categories]);
+  }, [filters.category_ids, categories]);
+  const includesUncategorized = filters.category_ids.includes('uncategorized');
 
   const filtered = useMemo(() => {
     const hasCustomRange = dateRange.from || dateRange.to;
@@ -315,14 +330,18 @@ export default function Transactions() {
         if (!matchesDescription && !matchesAmount) return false;
       }
       if (row._type === 'expense') {
-        if (filters.category_id === 'uncategorized' && row.category_id) return false;
-        if (categoryFilterIds && !categoryFilterIds.has(row.category_id)) return false;
+        if (filters.category_ids.length > 0) {
+          const matchesCategory = row.category_id
+            ? !!categoryFilterIds && categoryFilterIds.has(row.category_id)
+            : includesUncategorized;
+          if (!matchesCategory) return false;
+        }
         if (filters.payment_method !== 'all' && row.payment_method !== filters.payment_method) return false;
       } else {
         // A category filter is expense-only — no income row can ever match
         // a specific category or "uncategorized," so filter them all out
         // rather than silently ignoring the filter for this type.
-        if (filters.category_id !== 'all') return false;
+        if (filters.category_ids.length > 0) return false;
         if (filters.source !== 'all' && row.source !== filters.source) return false;
       }
       return true;
@@ -668,18 +687,18 @@ export default function Transactions() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {type !== 'income' && (
-            <Select value={filters.category_id} onValueChange={(v) => set('category_id', v)}>
-              <SelectTrigger><SelectValue placeholder={t('transactions.categoryPlaceholder')} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('transactions.allCategories')}</SelectItem>
-                <SelectItem value="uncategorized">{t('transactions.uncategorized')}</SelectItem>
-                {flattenCategoryTree(categories).map((c) => (
-                  <SelectItem key={c.id} value={c.id} className={c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}>
-                    {c.depth > 0 ? '↳ ' : ''}{c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategoryMultiSelect
+              entries={categoryFilterEntries}
+              selectedIds={filters.category_ids}
+              onToggle={(id) => set('category_ids', filters.category_ids.includes(id)
+                ? filters.category_ids.filter((x) => x !== id)
+                : [...filters.category_ids, id])}
+              onClear={() => set('category_ids', [])}
+              allLabel={t('transactions.allCategories')}
+              selectedLabel={(count) => t('transactions.categoriesSelected', { count })}
+              clearLabel={t('transactions.clearSelection')}
+              triggerClassName="h-9 text-sm w-full justify-between font-normal"
+            />
           )}
           {type === 'expense' && (
             <Select value={filters.payment_method} onValueChange={(v) => set('payment_method', v)}>
