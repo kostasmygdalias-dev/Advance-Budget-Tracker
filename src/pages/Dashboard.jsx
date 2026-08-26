@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { startOfWeek, endOfWeek } from 'date-fns';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { entities, createBackupSnapshot, listBackupSnapshots } from '@/lib/sheetsStore';
 import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
 import { useSubscription } from '@/hooks/use-subscription';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag,
+  Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, Tag,
   Receipt, FolderTree, PiggyBank, Wallet, Coins, Bell,
 } from 'lucide-react';
 import {
@@ -28,6 +26,8 @@ import { amountIncludingChildren } from '@/lib/categoryTree';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
+
+const DashboardCustomizePanel = lazy(() => import('@/components/DashboardCustomizePanel'));
 
 const INCOME_COLOR = '#10b981';
 
@@ -782,41 +782,14 @@ export default function Dashboard() {
           )}
 
           {customizing && (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm font-medium">{t('dashboard.customizePanelTitle')}</p>
-                  <p className="text-xs text-muted-foreground">{t('dashboard.customizePanelSubtitle')}</p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>{t('dashboard.done')}</Button>
-              </div>
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId="dashboard-widgets">
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
-                      {layout.map((w, index) => (
-                        <Draggable key={w.id} draggableId={w.id} index={index}>
-                          {(dragProvided) => (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
-                            >
-                              <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
-                                <GripVertical className="w-4 h-4" />
-                              </span>
-                              <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{t(`dashboard.widgets.${w.id}`)}</span>
-                              <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-            </Card>
+            <Suspense fallback={<Card className="p-4 h-32 animate-pulse bg-muted/30" />}>
+              <DashboardCustomizePanel
+                layout={layout}
+                onDragEnd={onDragEnd}
+                onToggleWidget={toggleWidget}
+                onDone={() => setCustomizing(false)}
+              />
+            </Suspense>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
