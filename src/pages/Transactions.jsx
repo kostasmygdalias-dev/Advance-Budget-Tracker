@@ -310,7 +310,8 @@ export default function Transactions() {
       if (filters.search) {
         const term = filters.search.trim().toLowerCase();
         const matchesDescription = (row.description || '').toLowerCase().includes(term);
-        const matchesAmount = String(row.amount ?? '').includes(term);
+        const matchesAmount = String(row.amount ?? '').includes(term)
+          || (row.amortization_schedule || []).some((s) => String(s.amount ?? '').includes(term));
         if (!matchesDescription && !matchesAmount) return false;
       }
       if (row._type === 'expense') {
