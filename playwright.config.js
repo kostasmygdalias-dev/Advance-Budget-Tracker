@@ -28,6 +28,11 @@ export default defineConfig({
       // real "not configured" fail-open default, so existing tests are
       // unaffected unless they explicitly override it.
       VITE_SUBSCRIPTION_API_URL: 'https://billing.test',
+      // Fake, never actually fetched (getUpgradeUrl() just builds a URL from
+      // it client-side) — set so the real "Upgrade to Pro" CTA renders in
+      // tests instead of its "not available" fallback. Tests should assert
+      // its presence, not click it — clicking navigates the browser away.
+      VITE_STRIPE_PAYMENT_LINK: 'https://buy.stripe.com/test_fake',
     },
     timeout: 60_000,
   },

@@ -23,7 +23,7 @@ export default function Settings() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { t, lang, setLang } = useLanguage();
-  const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
+  const { active: subActive, loading: subLoading, configured: billingConfigured } = useSubscription();
   const [settings, setSettings] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -296,7 +296,7 @@ export default function Settings() {
               {portalLoading ? t('settings.opening') : t('settings.manageSubscription')}
             </Button>
           ) : (
-            upgradeUrl && <Button onClick={() => { window.location.href = upgradeUrl; }}>{t('settings.upgradeToPro')}</Button>
+            <Link to="/upgrade"><Button>{t('settings.upgradeToPro')}</Button></Link>
           )}
         </Card>
       )}
@@ -345,7 +345,7 @@ export default function Settings() {
               )
             )
           ) : (
-            upgradeUrl && <Button variant="outline" onClick={() => { window.location.href = upgradeUrl; }}>{t('settings.upgradeToPro')}</Button>
+            <Link to="/upgrade"><Button variant="outline">{t('settings.upgradeToPro')}</Button></Link>
           )}
         </Card>
       )}

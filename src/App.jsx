@@ -24,6 +24,7 @@ const Goals = lazy(() => import('@/pages/Goals'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const Budgets = lazy(() => import('@/pages/Budgets'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
+const Upgrade = lazy(() => import('@/pages/Upgrade'));
 const Login = lazy(() => import('@/pages/Login'));
 
 const PageSpinner = () => (
@@ -64,6 +65,7 @@ const AuthenticatedApp = () => {
               <Route path="/reports" element={<Reports />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/upgrade" element={<Upgrade />} />
             </Route>
           </Route>
           <Route path="*" element={<PageNotFound />} />

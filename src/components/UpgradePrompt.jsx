@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Lock, Check } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function UpgradePrompt({ upgradeUrl }) {
       ) : (
         <p className="text-sm text-muted-foreground">{t('upgradePrompt.notAvailable')}</p>
       )}
+      <Link to="/upgrade" className="text-xs text-muted-foreground underline block">{t('upgradePrompt.seeAllBenefits')}</Link>
     </div>
   );
 }

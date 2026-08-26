@@ -40,10 +40,11 @@ function PlanBadge({ isPro }) {
   );
 }
 
-function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onOpenPalette, children }) {
+function AccountMenu({ user, isPro, billingConfigured, onLogout, onOpenPalette, children }) {
   const { toast } = useToast();
   const [isDark, toggleDark] = useDarkMode();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const manageSubscription = async () => {
     try {
@@ -69,11 +70,9 @@ function AccountMenu({ user, isPro, billingConfigured, upgradeUrl, onLogout, onO
                 <Crown className="w-4 h-4 mr-2" /> {t('accountMenu.manageSubscription')}
               </DropdownMenuItem>
             ) : (
-              upgradeUrl && (
-                <DropdownMenuItem onSelect={() => { window.location.href = upgradeUrl; }}>
-                  <Crown className="w-4 h-4 mr-2" /> {t('accountMenu.upgradeToPro')}
-                </DropdownMenuItem>
-              )
+              <DropdownMenuItem onSelect={() => navigate('/upgrade')}>
+                <Crown className="w-4 h-4 mr-2" /> {t('accountMenu.upgradeToPro')}
+              </DropdownMenuItem>
             )}
           </>
         )}
@@ -98,7 +97,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-  const { active: subActive, configured: billingConfigured, loading: subLoading, upgradeUrl } = useSubscription();
+  const { active: subActive, configured: billingConfigured, loading: subLoading } = useSubscription();
   const isPro = billingConfigured && subActive;
   const showProBadge = billingConfigured && !subActive;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -137,7 +136,7 @@ export default function Layout() {
             <span className="font-heading font-semibold tracking-tight truncate">ExpenseTrack</span>
             {!subLoading && <PlanBadge isPro={isPro} />}
           </Link>
-          <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
+          <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
             <button
               className="h-full px-3 flex items-center hover:bg-sidebar-accent/40 transition-colors shrink-0"
               aria-label={t('accountMenu.openMenu')}
@@ -169,6 +168,17 @@ export default function Layout() {
               </Link>
             );
           })}
+          {showProBadge && (
+            <Link
+              to="/upgrade"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                location.pathname === '/upgrade' ? 'bg-primary/15 text-primary' : 'text-primary hover:bg-primary/10'
+              )}
+            >
+              <Crown className="w-4 h-4" /> {t('nav.upgrade')}
+            </Link>
+          )}
         </nav>
         <div className="p-3 border-t">
           <button
@@ -218,6 +228,18 @@ export default function Layout() {
                   </Link>
                 );
               })}
+              {showProBadge && (
+                <Link
+                  to="/upgrade"
+                  onClick={() => setNavOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    location.pathname === '/upgrade' ? 'bg-primary/15 text-primary' : 'text-primary hover:bg-primary/10'
+                  )}
+                >
+                  <Crown className="w-4 h-4" /> {t('nav.upgrade')}
+                </Link>
+              )}
             </nav>
           </SheetContent>
         </Sheet>
@@ -229,7 +251,7 @@ export default function Layout() {
           <span className="font-heading font-semibold truncate">ExpenseTrack</span>
           {!subLoading && <PlanBadge isPro={isPro} />}
         </Link>
-        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} upgradeUrl={upgradeUrl} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
+        <AccountMenu user={user} isPro={isPro} billingConfigured={billingConfigured} onLogout={handleLogout} onOpenPalette={() => setPaletteOpen(true)}>
           <button
             className="p-2 rounded-md hover:bg-muted transition-colors shrink-0"
             aria-label={t('accountMenu.openMenu')}

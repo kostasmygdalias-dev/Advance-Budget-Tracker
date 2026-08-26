@@ -50,6 +50,7 @@ export const en = {
     budgets: 'Budgets',
     reports: 'Reports',
     settings: 'Settings',
+    upgrade: 'Upgrade to Pro',
     categories: 'Categories',
     debts: 'Debts & IOUs',
   },
@@ -427,6 +428,23 @@ export const en = {
     feature3: 'Cancel anytime',
     upgradeToPro: 'Upgrade to Pro',
     notAvailable: "Upgrades aren't available yet — check back soon.",
+    seeAllBenefits: 'See everything Pro includes',
+  },
+
+  upgrade: {
+    title: 'Get more out of your money',
+    subtitle: "Pro unlocks the parts of the app that save you from doing things by hand, every month.",
+    recurringTitle: 'Recurring templates',
+    recurringBody: "Set up salary, rent, subscriptions, and anything else that repeats. Generate the next entry in one click instead of re-typing it every time.",
+    viberTitle: 'Add expenses by chatting on Viber',
+    viberBody: "Text your bot to log an expense, log income, or ask for a quick report — no need to open the app at all.",
+    remindersTitle: 'Upcoming charge reminders',
+    remindersBody: "A heads-up on your Dashboard for recurring charges due in the next 7 days, so nothing catches you off guard.",
+    pitch: "One subscription unlocks all of it — for less effort tracking your money, not more.",
+    cta: 'Upgrade to Pro',
+    cancelAnytime: 'Cancel anytime from Settings.',
+    alreadyPro: "You're already on Pro — thank you!",
+    manageInSettings: 'Manage subscription',
   },
 
   amortizationPreview: {
