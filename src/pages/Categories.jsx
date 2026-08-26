@@ -61,6 +61,7 @@ export default function Categories() {
   const [colorTouched, setColorTouched] = useState(false);
   const [iconTouched, setIconTouched] = useState(false);
   const [addingDefaults, setAddingDefaults] = useState(false);
+  const [saving, setSaving] = useState(false);
   const invalidateCategories = useInvalidateCategories();
 
   const load = () => {
@@ -107,7 +108,12 @@ export default function Categories() {
 
   const save = async (e) => {
     e.preventDefault();
-    if (!editing.name.trim()) return;
+    // Without this guard, a double-click/double-tap before the first
+    // request resolves re-enters save() while editing.id is still unset,
+    // so both calls take the create() branch and the category gets added
+    // twice.
+    if (!editing.name.trim() || saving) return;
+    setSaving(true);
     const parent_id = editing.parent_id && editing.parent_id !== '__none__' ? editing.parent_id : null;
     const siblings = categories.filter((c) => (c.parent_id || null) === parent_id && c.id !== editing.id);
     const payload = {
@@ -128,6 +134,8 @@ export default function Categories() {
       invalidateCategories();
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -292,7 +300,7 @@ export default function Categories() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full">{t('common.save')}</Button>
+              <Button type="submit" className="w-full" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</Button>
             </form>
           </Card>
         </div>
