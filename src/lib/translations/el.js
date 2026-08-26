@@ -150,7 +150,7 @@ export const el = {
     tabAll: 'Όλα',
     tabIncome: 'Έσοδα',
     tabExpenses: 'Έξοδα',
-    searchPlaceholder: 'Αναζήτηση περιγραφής',
+    searchPlaceholder: 'Αναζήτηση περιγραφής ή ποσού',
     categoryPlaceholder: 'Κατηγορία',
     methodPlaceholder: 'Μέθοδος',
     sourcePlaceholder: 'Πηγή',

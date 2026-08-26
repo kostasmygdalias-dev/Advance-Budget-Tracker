@@ -307,7 +307,12 @@ export default function Transactions() {
         if (dateRange.to && (row._date || '') > dateRange.to) return false;
       } else if (month && !(row._date || '').startsWith(month)) return false;
       if (type !== 'all' && row._type !== type) return false;
-      if (filters.search && !(row.description || '').toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.search) {
+        const term = filters.search.trim().toLowerCase();
+        const matchesDescription = (row.description || '').toLowerCase().includes(term);
+        const matchesAmount = String(row.amount ?? '').includes(term);
+        if (!matchesDescription && !matchesAmount) return false;
+      }
       if (row._type === 'expense') {
         if (filters.category_id === 'uncategorized' && row.category_id) return false;
         if (categoryFilterIds && !categoryFilterIds.has(row.category_id)) return false;

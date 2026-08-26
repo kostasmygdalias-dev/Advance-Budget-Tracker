@@ -150,7 +150,7 @@ export const en = {
     tabAll: 'All',
     tabIncome: 'Income',
     tabExpenses: 'Expenses',
-    searchPlaceholder: 'Search description',
+    searchPlaceholder: 'Search description or amount',
     categoryPlaceholder: 'Category',
     methodPlaceholder: 'Method',
     sourcePlaceholder: 'Source',
