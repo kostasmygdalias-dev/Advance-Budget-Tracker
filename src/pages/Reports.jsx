@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, ChevronDown } from 'lucide-react';
 import {
   getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths,
 } from '@/lib/finance';
@@ -61,6 +62,54 @@ const PRESETS = [
   { key: 'preset12mo', months: 12 },
 ];
 
+// Lets the focus drill-down combine more than one category/subcategory
+// (e.g. "Fuel" + "Parking") into a single view instead of picking just one —
+// a checkbox popover rather than a native <select>, since HTML selects can't
+// represent multiple checked options with a readable trigger label.
+function CategoryMultiSelect({ categoryReport, selectedIds, onToggle, onClear, t }) {
+  const [open, setOpen] = useState(false);
+  const flatEntries = categoryReport.flatMap((g) => [
+    { ...g, depth: 0 },
+    ...g.children.map((c) => ({ ...c, depth: 1 })),
+  ]);
+  const selectedEntries = flatEntries.filter((e) => selectedIds.includes(e.id));
+  const label = selectedIds.length === 0
+    ? t('reports.allCategories')
+    : selectedIds.length === 1
+      ? selectedEntries[0]?.name
+      : t('reports.categoriesSelected', { count: selectedIds.length });
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-xs w-48 justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-1" align="end">
+        <div className="max-h-72 overflow-y-auto space-y-0.5">
+          <button
+            type="button"
+            onClick={() => { onClear(); setOpen(false); }}
+            className={`w-full flex items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${selectedIds.length === 0 ? 'font-medium' : ''}`}
+          >
+            {t('reports.allCategories')}
+          </button>
+          {flatEntries.map((c) => (
+            <label
+              key={c.id}
+              className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors cursor-pointer ${c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}`}
+            >
+              <Checkbox checked={selectedIds.includes(c.id)} onCheckedChange={() => onToggle(c.id)} />
+              <span className="truncate">{c.depth > 0 ? '↳ ' : ''}{c.name}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Reports() {
   const { t, lang } = useLanguage();
   const incomeSources = getIncomeSources(t);
@@ -76,7 +125,7 @@ export default function Reports() {
   const loadError = txError || catQuery.error || setQuery.error;
   const [fromMonth, setFromMonth] = useState(getRecentMonths(6)[0]);
   const [toMonth, setToMonth] = useState(currentMonthStr());
-  const [focusCategoryId, setFocusCategoryId] = useState('all');
+  const [focusCategoryIds, setFocusCategoryIds] = useState([]);
 
   const load = () => {
     setTxLoading(true);
@@ -204,24 +253,53 @@ export default function Reports() {
   });
   categoryReport.sort((a, b) => b.total - a.total);
 
-  // Drill-down for whichever single category the user focused (a top-level
-  // group with its children, a child on its own, or nothing when "all").
-  // Reuses categoryReport's already-rolled-up totals rather than
-  // recomputing them, and adds the one thing that view can't show: a
-  // month-by-month trend for just this category.
-  const focusGroup = focusCategoryId !== 'all' ? categoryReport.find((g) => g.id === focusCategoryId) : null;
-  const focusChild = !focusGroup && focusCategoryId !== 'all'
-    ? categoryReport.flatMap((g) => g.children).find((c) => c.id === focusCategoryId)
-    : null;
-  const focusEntry = focusGroup || focusChild;
-  const focusMonthlyIds = focusGroup
-    ? new Set([focusGroup.id, ...focusGroup.children.map((c) => c.id)])
-    : (focusChild ? new Set([focusChild.id]) : null);
-  const focusMonthly = focusMonthlyIds ? months.map((m) => ({
+  // Drill-down for whichever category/categories the user focused — any mix
+  // of top-level groups and individual subcategories, combined into one
+  // view. focusIdSet expands each selected group to itself + its children
+  // (a Set, so selecting a parent AND one of its own children never double-
+  // counts), then categoryTotals/categoryCounts — already deduped per raw
+  // category_id — are summed straight off it. Adds the one thing the plain
+  // list can't show: a month-by-month trend for just this selection.
+  const focusIdSet = new Set();
+  focusCategoryIds.forEach((id) => {
+    const group = categoryReport.find((g) => g.id === id);
+    if (group) {
+      focusIdSet.add(group.id);
+      group.children.forEach((c) => focusIdSet.add(c.id));
+    } else {
+      focusIdSet.add(id);
+    }
+  });
+  const focusEntries = categoryReport.flatMap((g) => [g, ...g.children]).filter((e) => focusCategoryIds.includes(e.id));
+  const focusEntry = focusIdSet.size > 0 ? {
+    name: focusEntries.length === 1 ? focusEntries[0].name : t('reports.categoriesSelected', { count: focusEntries.length }),
+    icon: focusEntries.length === 1 ? focusEntries[0].icon : null,
+    color: focusEntries.length === 1 ? focusEntries[0].color : PALETTE[0],
+    total: [...focusIdSet].reduce((s, id) => s + (categoryTotals[id] || 0), 0),
+  } : null;
+  // Only groups (not standalone subcategories) have a breakdown to show —
+  // every child of every selected group, plus any subcategory picked on its
+  // own, deduped so picking both a group and its own child lists it once.
+  const focusHasGroupSelection = focusCategoryIds.some((id) => categoryReport.some((g) => g.id === id));
+  const focusBreakdownRows = (() => {
+    const rows = [];
+    const seen = new Set();
+    focusCategoryIds.forEach((id) => {
+      const group = categoryReport.find((g) => g.id === id);
+      if (group) {
+        group.children.forEach((c) => { if (!seen.has(c.id)) { rows.push(c); seen.add(c.id); } });
+      } else {
+        const child = categoryReport.flatMap((g) => g.children).find((c) => c.id === id);
+        if (child && !seen.has(child.id)) { rows.push(child); seen.add(child.id); }
+      }
+    });
+    return rows.sort((a, b) => b.total - a.total);
+  })();
+  const focusMonthly = focusIdSet.size > 0 ? months.map((m) => ({
     month: monthLabel(m, lang),
     total: expenses.reduce((s, e) => {
       if ((e.currency || 'EUR') !== currency) return s;
-      if (!focusMonthlyIds.has(e.category_id || 'uncategorized')) return s;
+      if (!focusIdSet.has(e.category_id || 'uncategorized')) return s;
       return s + getMonthlyContribution(e, m);
     }, 0),
   })) : [];
@@ -392,18 +470,13 @@ export default function Reports() {
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
             <p className="text-sm font-medium">{t('reports.spendingByCategory')}</p>
             {categoryReport.length > 0 && (
-              <Select value={focusCategoryId} onValueChange={setFocusCategoryId}>
-                <SelectTrigger className="w-48 h-8 text-xs"><SelectValue placeholder={t('reports.focusCategory')} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('reports.allCategories')}</SelectItem>
-                  {categoryReport.flatMap((g) => [
-                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>,
-                    ...g.children.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="pl-6 text-muted-foreground">↳ {c.name}</SelectItem>
-                    )),
-                  ])}
-                </SelectContent>
-              </Select>
+              <CategoryMultiSelect
+                categoryReport={categoryReport}
+                selectedIds={focusCategoryIds}
+                onToggle={(id) => setFocusCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+                onClear={() => setFocusCategoryIds([])}
+                t={t}
+              />
             )}
           </div>
           {categoryReport.length === 0 ? (
@@ -427,12 +500,12 @@ export default function Reports() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              {focusGroup && (
-                focusGroup.children.length === 0 ? (
+              {focusHasGroupSelection && (
+                focusBreakdownRows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t('reports.noSubcategorySpending')}</p>
                 ) : (
                   <div className="space-y-2">
-                    {focusGroup.children.map((c) => (
+                    {focusBreakdownRows.map((c) => (
                       <div key={c.id} className="flex items-center gap-3 text-sm">
                         <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-7 h-7" />
                         <span className="flex-1 min-w-0 truncate">{c.name}</span>
