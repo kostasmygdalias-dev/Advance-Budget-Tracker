@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from '@/components/ui/use-toast';
 import {
   Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag,
-  Receipt, FolderTree, PiggyBank, Wallet,
+  Receipt, FolderTree, PiggyBank, Wallet, Coins,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
@@ -384,7 +384,7 @@ export default function Dashboard() {
   // amounts across currencies (e.g. some expenses in EUR, some in USD)
   // would silently produce a meaningless number — there's no conversion
   // rate available without a paid FX API, so other-currency transactions
-  // are excluded and called out instead of blended in wrong.
+  // are excluded here; otherCurrencyCount (below) surfaces that via a banner.
   const trendData = months.map((m) => ({
     month: monthLabel(m, lang),
     income: incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, m) ? i.amount || 0 : 0), 0),
@@ -396,6 +396,10 @@ export default function Dashboard() {
   const uncategorizedCount = expenses.filter((e) =>
     !e.category_id && (e.currency || 'EUR') === currency && getMonthlyContribution(e, thisMonth) > 0
   ).length;
+
+  const otherCurrencyCount =
+    expenses.filter((e) => (e.currency || 'EUR') !== currency && getMonthlyContribution(e, thisMonth) > 0).length +
+    incomes.filter((i) => (i.currency || 'EUR') !== currency && isInMonth(i.received_date, thisMonth)).length;
 
   const recentTransactions = [
     ...expenses.map((e) => ({ ...e, _type: 'expense', _date: e.paid_date })),
@@ -701,6 +705,18 @@ export default function Dashboard() {
               <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
                 <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
               </Link>
+            </Card>
+          )}
+
+          {otherCurrencyCount > 0 && (
+            <Card className="p-4 flex items-center gap-3 flex-wrap text-muted-foreground">
+              <Coins className="w-5 h-5 shrink-0" />
+              <p className="text-sm">
+                {otherCurrencyCount === 1
+                  ? t('dashboard.otherCurrenciesNoteOne', { currency, count: otherCurrencyCount })
+                  : t('dashboard.otherCurrenciesNoteOther', { currency, count: otherCurrencyCount })}{' '}
+                <Link to="/transactions?month=all" className="underline">{t('dashboard.viewThem')}</Link>.
+              </p>
             </Card>
           )}
 
