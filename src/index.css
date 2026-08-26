@@ -90,3 +90,18 @@
     @apply bg-background text-foreground font-body;
   }
 }
+
+/* "Export PDF" on Reports is just window.print() with the browser's own
+   "Save as PDF" destination — this is what makes the printed page look like
+   a report instead of the full app chrome. */
+@media print {
+  aside, header, .no-print {
+    display: none !important;
+  }
+  main {
+    padding-left: 0 !important;
+  }
+  body {
+    background: white;
+  }
+}

@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { entities } from '@/lib/sheetsStore';
+import { entities, createBackupSnapshot, listBackupSnapshots, getBackupSnapshotJson } from '@/lib/sheetsStore';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
 import { openBillingPortal } from '@/lib/subscription';
 import { parseCsv } from '@/lib/csv';
+import { downloadJson } from '@/lib/exportFile';
+import { useInvalidateSettings } from '@/hooks/useEntities';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
@@ -31,6 +33,46 @@ export default function Settings() {
   const [importType, setImportType] = useState('expense');
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
+  const [backups, setBackups] = useState([]);
+  const [backupsLoading, setBackupsLoading] = useState(true);
+  const [backingUp, setBackingUp] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
+  const invalidateSettings = useInvalidateSettings();
+
+  const loadBackups = () => {
+    setBackupsLoading(true);
+    listBackupSnapshots()
+      .then(setBackups)
+      .catch(() => {}) // non-critical — the rest of Settings still works if this fails
+      .finally(() => setBackupsLoading(false));
+  };
+
+  useEffect(loadBackups, []);
+
+  const backupNow = async () => {
+    setBackingUp(true);
+    try {
+      await createBackupSnapshot();
+      toast({ title: t('settings.backupCreated') });
+      loadBackups();
+    } catch (err) {
+      toast({ title: t('settings.couldNotBackup'), description: err.message, variant: 'destructive' });
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
+  const downloadBackup = async (id, created_date) => {
+    setDownloadingId(id);
+    try {
+      const json = await getBackupSnapshotJson(id);
+      downloadJson(`expensetrack-backup-${created_date.slice(0, 10)}.json`, json);
+    } catch (err) {
+      toast({ title: t('settings.couldNotDownloadBackup'), description: err.message, variant: 'destructive' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const manageSubscription = async () => {
     setPortalLoading(true);
@@ -61,6 +103,7 @@ export default function Settings() {
             budget_per_category: {},
           });
           setSettings(created);
+          invalidateSettings();
         }
         setCategories(cats);
       } catch (err) {
@@ -82,6 +125,7 @@ export default function Settings() {
         default_currency: settings.default_currency,
         budget_period: settings.budget_period || 'monthly',
       });
+      invalidateSettings();
       toast({ title: t('settings.settingsSaved') });
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
@@ -260,6 +304,32 @@ export default function Settings() {
             <Upload className="w-4 h-4 mr-1" /> {importing ? t('settings.importing') : t('settings.chooseCsvFile')}
           </Button>
         </div>
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <div>
+          <p className="text-sm font-medium">{t('settings.backupsTitle')}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('settings.backupsDescription')}</p>
+        </div>
+        <Button variant="outline" onClick={backupNow} disabled={backingUp}>
+          <History className="w-4 h-4 mr-1" /> {backingUp ? t('settings.backingUp') : t('settings.backupNow')}
+        </Button>
+        {!backupsLoading && (
+          backups.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('settings.noBackupsYet')}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {backups.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-3 text-sm py-1.5 border-b last:border-0">
+                  <span className="tabular-nums">{new Date(b.created_date).toLocaleString(lang === 'el' ? 'el-GR' : undefined)}</span>
+                  <Button variant="ghost" size="sm" onClick={() => downloadBackup(b.id, b.created_date)} disabled={downloadingId === b.id}>
+                    <Download className="w-3.5 h-3.5 mr-1" /> {t('settings.downloadBackup')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </Card>
 
       <div className="flex items-center gap-3 flex-wrap">

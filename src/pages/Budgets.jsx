@@ -10,6 +10,7 @@ import { Save } from 'lucide-react';
 import { getMonthlyContribution, currentMonthStr } from '@/lib/finance';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { amountIncludingChildren } from '@/lib/categoryTree';
+import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -70,34 +71,39 @@ function BudgetRow({ category, spent, currency, value, onChange, indent, compute
 export default function Budgets() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [settings, setSettings] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const catQuery = useCategoriesQuery();
+  const setQuery = useSettingsQuery();
+  const invalidateSettings = useInvalidateSettings();
+  const categories = catQuery.data || [];
+  const settings = setQuery.data?.[0] || null;
   const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
+  const loading = txLoading || catQuery.isLoading || setQuery.isLoading;
+  const loadError = txError || catQuery.error || setQuery.error;
   const [saving, setSaving] = useState(false);
   const [totalBudget, setTotalBudget] = useState('');
   const [perCategory, setPerCategory] = useState({});
 
   const load = () => {
-    setLoading(true);
-    setLoadError(null);
+    setTxLoading(true);
+    setTxError(null);
     (async () => {
       try {
-        const [sets, cats, exp] = await Promise.all([
-          entities.Settings.list(),
-          entities.Category.list(),
-          entities.Expense.list('-paid_date', 500),
-        ]);
-        setSettings(sets[0] || null);
-        setCategories(cats);
+        const exp = await entities.Expense.list('-paid_date', 500);
         setExpenses(exp);
       } catch (err) {
-        setLoadError(err);
+        setTxError(err);
       } finally {
-        setLoading(false);
+        setTxLoading(false);
       }
     })();
+  };
+
+  const retryAll = () => {
+    load();
+    catQuery.refetch();
+    setQuery.refetch();
   };
 
   useEffect(load, []);
@@ -132,11 +138,11 @@ export default function Budgets() {
           payload[c.id] = sum > 0 ? sum : null;
         }
       });
-      const updated = await entities.Settings.update(settings.id, {
+      await entities.Settings.update(settings.id, {
         monthly_budget_total: totalBudget === '' ? null : parseFloat(totalBudget),
         budget_per_category: payload,
       });
-      setSettings(updated);
+      invalidateSettings();
       toast({ title: t('budgets.saved') });
     } catch (err) {
       toast({ title: t('common.couldNotSave'), description: err.message, variant: 'destructive' });
@@ -148,7 +154,7 @@ export default function Budgets() {
   const updateCatBudget = (catId, v) => setPerCategory((p) => ({ ...p, [catId]: v === '' ? null : parseFloat(v) }));
 
   if (loading) return <PageSkeleton rows={3} />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loadError) return <LoadError error={loadError} onRetry={retryAll} />;
 
   const currency = settings?.default_currency || 'EUR';
   const budgetPeriod = settings?.budget_period || 'monthly';

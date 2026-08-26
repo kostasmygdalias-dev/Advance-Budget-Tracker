@@ -3,10 +3,19 @@
 // signed-in user's own Drive on first use. No backend — reads/writes go
 // straight from the browser to the Sheets/Drive APIs using the user's own
 // OAuth token, so nobody but that user (and Google) ever sees their data.
+import { z } from 'zod';
 import { getAccessToken, refreshAccessTokenSilently } from '@/lib/googleAuth';
 
 const SPREADSHEET_TITLE = 'ExpenseTrack Data';
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
+
+// Sheets/Drive enforce per-minute quotas per user — a burst of calls (e.g.
+// loading several collections in parallel on page load) can trip a 429.
+// Retried with backoff (honoring Retry-After when Google sends one) instead
+// of surfacing a hard error for what's normally a transient, self-resolving
+// condition.
+const MAX_RETRIES = 4;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function authedFetch(url, init = {}) {
   const doFetch = (token) => fetch(url, {
@@ -14,15 +23,23 @@ async function authedFetch(url, init = {}) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
   });
 
-  let res = await doFetch(getAccessToken());
-  if (res.status === 401) {
-    const fresh = await refreshAccessTokenSilently();
-    res = await doFetch(fresh);
+  for (let attempt = 0; ; attempt++) {
+    let res = await doFetch(getAccessToken());
+    if (res.status === 401) {
+      const fresh = await refreshAccessTokenSilently();
+      res = await doFetch(fresh);
+    }
+    if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get('Retry-After'));
+      const delay = retryAfter > 0 ? retryAfter * 1000 : (2 ** attempt) * 500 + Math.random() * 250;
+      await sleep(delay);
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(`Google API error ${res.status}: ${await res.text()}`);
+    }
+    return res.status === 204 ? null : res.json();
   }
-  if (!res.ok) {
-    throw new Error(`Google API error ${res.status}: ${await res.text()}`);
-  }
-  return res.status === 204 ? null : res.json();
 }
 
 const sheetsFetch = (path, init) => authedFetch(`https://sheets.googleapis.com/v4/spreadsheets${path}`, init);
@@ -36,6 +53,10 @@ const SCHEMAS = {
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period', 'dashboard_layout'],
   Debts: ['id', 'person', 'direction', 'total_amount', 'paid_amount', 'currency', 'start_date', 'due_date', 'notes', 'created_date'],
   Goals: ['id', 'name', 'icon', 'target_amount', 'saved_amount', 'currency', 'deadline', 'created_date'],
+  // Full-data snapshots for backup/versioning — a JSON blob per snapshot,
+  // split across rows (chunk_index/chunk_total) since a single Sheets cell
+  // caps out around 50,000 characters and a snapshot can exceed that.
+  Backups: ['id', 'created_date', 'chunk_index', 'chunk_total', 'data'],
 };
 
 let spreadsheetIdPromise = null;
@@ -277,7 +298,7 @@ function sortBy(list, sort) {
   });
 }
 
-function makeStore(sheetName, toRow, fromRow) {
+function makeStore(sheetName, toRow, fromRow, rowSchema) {
   const headers = SCHEMAS[sheetName];
   const lastCol = COLS[headers.length - 1];
 
@@ -285,9 +306,28 @@ function makeStore(sheetName, toRow, fromRow) {
     const spreadsheetId = await getSpreadsheetId();
     const data = await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A2:${lastCol}`);
     const rows = data.values || [];
-    return rows
-      .map((row, i) => ({ ...fromRow(row), _row: i + 2 }))
-      .filter((r) => r.id);
+    const parsed = [];
+    rows.forEach((row, i) => {
+      // A single hand-edited or corrupted cell (e.g. invalid JSON in a tags
+      // column) shouldn't take down the whole list — skip just that row.
+      let record;
+      try {
+        record = { ...fromRow(row), _row: i + 2 };
+      } catch (err) {
+        console.warn(`Skipping unparsable ${sheetName} row ${i + 2}:`, err);
+        return;
+      }
+      if (!record.id) return;
+      if (rowSchema) {
+        const result = rowSchema.safeParse(record);
+        if (!result.success) {
+          console.warn(`Skipping malformed ${sheetName} row ${i + 2}:`, result.error.flatten());
+          return;
+        }
+      }
+      parsed.push(record);
+    });
+    return parsed;
   }
 
   return {
@@ -339,6 +379,50 @@ function makeStore(sheetName, toRow, fromRow) {
   };
 }
 
+// Shape-validates what fromRow() produces — catches wrong types slipping
+// through the naive coercion above (e.g. a formula error landing in a
+// numeric cell) without hand-writing a check for every field.
+const RowMeta = { _row: z.number() };
+const ExpenseSchema = z.object({
+  id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
+  paid_date: z.string(), category_id: z.string().nullable(), payment_method: z.string(),
+  notes: z.string().nullable(), tags: z.array(z.string()), receipt_file_url: z.string().nullable(),
+  expense_type: z.string(), period_value: z.number().nullable(), period_unit: z.string().nullable(),
+  amortization_schedule: z.array(z.any()), created_date: z.string(), reconciled: z.boolean(), ...RowMeta,
+});
+const IncomeSchema = z.object({
+  id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
+  received_date: z.string(), source: z.string(), notes: z.string().nullable(), tags: z.array(z.string()),
+  created_date: z.string(), reconciled: z.boolean(), ...RowMeta,
+});
+const CategorySchema = z.object({
+  id: z.string().min(1), name: z.string(), icon: z.string(), color: z.string(),
+  parent_id: z.string().nullable(), sort_order: z.number(), created_date: z.string(), ...RowMeta,
+});
+const RecurringTemplateSchema = z.object({
+  id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
+  frequency: z.string(), custom_interval_days: z.number().nullable(), next_due_date: z.string(),
+  active: z.boolean(), created_date: z.string(), type: z.string(), source: z.string().nullable(), ...RowMeta,
+});
+const SettingsSchema = z.object({
+  id: z.string().min(1), default_currency: z.string(), monthly_budget_total: z.number().nullable(),
+  // Loosely typed on purpose: this is a single row holding every setting
+  // (currency, layout, budgets) — over-validating one field (e.g. requiring
+  // every value be a number) would drop the *whole* row, including
+  // unrelated settings, over a shape mismatch in just this one map.
+  budget_per_category: z.record(z.string(), z.any()), created_date: z.string(), budget_period: z.string(),
+  dashboard_layout: z.any(), ...RowMeta,
+});
+const DebtSchema = z.object({
+  id: z.string().min(1), person: z.string(), direction: z.string(), total_amount: z.number(),
+  paid_amount: z.number(), currency: z.string(), start_date: z.string(), due_date: z.string().nullable(),
+  notes: z.string().nullable(), created_date: z.string(), ...RowMeta,
+});
+const GoalSchema = z.object({
+  id: z.string().min(1), name: z.string(), icon: z.string(), target_amount: z.number(), saved_amount: z.number(),
+  currency: z.string(), deadline: z.string().nullable(), created_date: z.string(), ...RowMeta,
+});
+
 const Expense = makeStore(
   'Expenses',
   (e) => [
@@ -355,6 +439,7 @@ const Expense = makeStore(
     amortization_schedule: amortization_schedule ? JSON.parse(amortization_schedule) : [], created_date: created_date || '',
     reconciled: reconciled === true || reconciled === 'TRUE',
   }),
+  ExpenseSchema,
 );
 
 const Category = makeStore(
@@ -364,6 +449,7 @@ const Category = makeStore(
     id, name: name || '', icon: icon || '', color: color || '', parent_id: parent_id || null,
     sort_order: sort_order !== '' && sort_order != null ? Number(sort_order) : 0, created_date: created_date || '',
   }),
+  CategorySchema,
 );
 
 const RecurringTemplate = makeStore(
@@ -379,6 +465,7 @@ const RecurringTemplate = makeStore(
     // `type` is missing (empty string) on rows written before recurring income existed — those were all expense templates.
     type: type || 'expense', source: source || null,
   }),
+  RecurringTemplateSchema,
 );
 
 const Settings = makeStore(
@@ -395,6 +482,7 @@ const Settings = makeStore(
     budget_period: budget_period || 'monthly',
     dashboard_layout: dashboard_layout ? JSON.parse(dashboard_layout) : null,
   }),
+  SettingsSchema,
 );
 
 const Income = makeStore(
@@ -408,6 +496,7 @@ const Income = makeStore(
     source: source || 'other', notes: notes || null, tags: tags ? JSON.parse(tags) : [], created_date: created_date || '',
     reconciled: reconciled === true || reconciled === 'TRUE',
   }),
+  IncomeSchema,
 );
 
 const Debt = makeStore(
@@ -422,6 +511,7 @@ const Debt = makeStore(
     currency: currency || 'EUR', start_date: start_date || '', due_date: due_date || null,
     notes: notes || null, created_date: created_date || '',
   }),
+  DebtSchema,
 );
 
 const Goal = makeStore(
@@ -435,9 +525,84 @@ const Goal = makeStore(
     target_amount: Number(target_amount) || 0, saved_amount: Number(saved_amount) || 0,
     currency: currency || 'EUR', deadline: deadline || null, created_date: created_date || '',
   }),
+  GoalSchema,
 );
 
 export const entities = { Expense, Income, Category, RecurringTemplate, Settings, Debt, Goal };
+
+// --- Backups: point-in-time snapshots of everything, written into the same
+// spreadsheet (no extra OAuth scope needed). A snapshot's JSON is chunked
+// across rows since one Sheets cell tops out around 50,000 characters.
+const BACKUP_CHUNK_SIZE = 40000;
+const BACKUP_KEEP = 10;
+
+async function readBackupRows(spreadsheetId) {
+  const data = await sheetsFetch(`/${spreadsheetId}/values/Backups!A2:E`);
+  return (data.values || []).map((row, i) => ({ row, _row: i + 2 }));
+}
+
+async function pruneOldBackups(spreadsheetId) {
+  const withIndex = await readBackupRows(spreadsheetId);
+  const byId = new Map();
+  withIndex.forEach(({ row: [id, created_date] }) => {
+    if (id && !byId.has(id)) byId.set(id, created_date || '');
+  });
+  const newestFirst = [...byId.entries()].sort((a, b) => b[1].localeCompare(a[1]));
+  const idsToDelete = new Set(newestFirst.slice(BACKUP_KEEP).map(([id]) => id));
+  if (!idsToDelete.size) return;
+  const gid = await getSheetGid(spreadsheetId, 'Backups');
+  const rowsToDelete = withIndex.filter(({ row }) => idsToDelete.has(row[0])).sort((a, b) => b._row - a._row);
+  await sheetsFetch(`/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: rowsToDelete.map(({ _row }) => ({
+        deleteDimension: { range: { sheetId: gid, dimension: 'ROWS', startIndex: _row - 1, endIndex: _row } },
+      })),
+    }),
+  });
+}
+
+// Snapshots every collection as one JSON document. Keeps only the newest
+// BACKUP_KEEP snapshots — older ones are pruned right after writing the new one.
+export async function createBackupSnapshot() {
+  const spreadsheetId = await getSpreadsheetId();
+  const [expenses, incomes, categories, recurring, settings, debts, goals] = await Promise.all([
+    Expense.list(), Income.list(), Category.list(), RecurringTemplate.list(), Settings.list(), Debt.list(), Goal.list(),
+  ]);
+  const json = JSON.stringify({ version: 1, expenses, incomes, categories, recurring, settings, debts, goals });
+  const id = crypto.randomUUID();
+  const created_date = new Date().toISOString();
+  const chunks = [];
+  for (let i = 0; i < json.length; i += BACKUP_CHUNK_SIZE) chunks.push(json.slice(i, i + BACKUP_CHUNK_SIZE));
+  if (!chunks.length) chunks.push('{}');
+  await sheetsFetch(`/${spreadsheetId}/values/Backups!A1:append?valueInputOption=RAW`, {
+    method: 'POST',
+    body: JSON.stringify({ values: chunks.map((chunk, idx) => [id, created_date, idx, chunks.length, chunk]) }),
+  });
+  await pruneOldBackups(spreadsheetId);
+  return { id, created_date };
+}
+
+export async function listBackupSnapshots() {
+  const spreadsheetId = await getSpreadsheetId();
+  const withIndex = await readBackupRows(spreadsheetId);
+  const byId = new Map();
+  withIndex.forEach(({ row: [id, created_date] }) => {
+    if (id && !byId.has(id)) byId.set(id, { id, created_date: created_date || '' });
+  });
+  return [...byId.values()].sort((a, b) => b.created_date.localeCompare(a.created_date));
+}
+
+// Reassembles one snapshot's JSON from its chunks, for the caller to trigger
+// a file download of (kept out of this module — no DOM/Blob access here).
+export async function getBackupSnapshotJson(id) {
+  const spreadsheetId = await getSpreadsheetId();
+  const withIndex = await readBackupRows(spreadsheetId);
+  const chunks = withIndex
+    .filter(({ row }) => row[0] === id)
+    .sort((a, b) => Number(a.row[2]) - Number(b.row[2]));
+  return chunks.map(({ row }) => row[4] || '').join('');
+}
 
 // Multipart upload to the user's Drive (drive.file scope: the app can only
 // see files it creates, not the rest of their Drive).

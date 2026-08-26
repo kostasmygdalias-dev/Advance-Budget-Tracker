@@ -5,7 +5,37 @@ on:
     branches: [master]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        # No real Google account needed — tests/mocks/googleApi.js fakes the
+        # Sheets/Drive/Identity Services calls, so this just needs a
+        # plausible-shaped client ID, never a real one.
+        run: npm run test:e2e
+        env:
+          VITE_GOOGLE_CLIENT_ID: test-client-id.apps.googleusercontent.com
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

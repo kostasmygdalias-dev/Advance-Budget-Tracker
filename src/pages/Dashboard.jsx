@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { startOfWeek, endOfWeek } from 'date-fns';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { entities } from '@/lib/sheetsStore';
+import { entities, createBackupSnapshot, listBackupSnapshots } from '@/lib/sheetsStore';
+import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag } from 'lucide-react';
+import {
+  Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag,
+  Receipt, FolderTree, PiggyBank, Wallet,
+} from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -27,6 +31,46 @@ const INCOME_COLOR = '#10b981';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
+
+const AUTO_BACKUP_CHECK_KEY = 'expensetrack_last_auto_backup_check';
+const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Shown instead of the (otherwise all-empty) widget grid for a brand-new
+// account — a short, concrete "what to do first" instead of nine cards all
+// saying "no data yet."
+function OnboardingGuide() {
+  const { t } = useLanguage();
+  const steps = [
+    { icon: Receipt, title: t('dashboard.onboarding.step1Title'), body: t('dashboard.onboarding.step1Body'), to: '/expenses/new', cta: t('dashboard.onboarding.step1Cta') },
+    { icon: FolderTree, title: t('dashboard.onboarding.step2Title'), body: t('dashboard.onboarding.step2Body'), to: '/categories', cta: t('dashboard.onboarding.step2Cta') },
+    { icon: PiggyBank, title: t('dashboard.onboarding.step3Title'), body: t('dashboard.onboarding.step3Body'), to: '/budgets', cta: t('dashboard.onboarding.step3Cta') },
+  ];
+  return (
+    <Card className="p-6 sm:p-8">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Wallet className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <p className="font-heading font-semibold text-lg">{t('dashboard.onboarding.title')}</p>
+          <p className="text-sm text-muted-foreground">{t('dashboard.onboarding.subtitle')}</p>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3 mt-6">
+        {steps.map((s, i) => (
+          <div key={i} className="flex flex-col gap-2 p-4 rounded-lg border">
+            <s.icon className="w-5 h-5 text-muted-foreground" />
+            <p className="text-sm font-medium">{s.title}</p>
+            <p className="text-xs text-muted-foreground flex-1">{s.body}</p>
+            <Link to={s.to}>
+              <Button variant="outline" size="sm" className="w-full mt-1">{s.cta}</Button>
+            </Link>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function parseLocalDateDash(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -236,34 +280,45 @@ export default function Dashboard() {
   const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [customizing, setCustomizing] = useState(false);
 
+  // Categories and Settings are cached across pages (see useEntities) —
+  // only expenses/incomes are fetched fresh here, since they change often
+  // and this page's own toasts/optimistic bits assume plain local state.
+  const catQuery = useCategoriesQuery();
+  const setQuery = useSettingsQuery();
+  const invalidateSettings = useInvalidateSettings();
+  const categories = catQuery.data || [];
+  const settings = setQuery.data?.[0] || null;
+  const loading = txLoading || catQuery.isLoading || setQuery.isLoading;
+  const loadError = txError || catQuery.error || setQuery.error;
+
   const load = () => {
-    setLoading(true);
-    setLoadError(null);
+    setTxLoading(true);
+    setTxError(null);
     (async () => {
       try {
-        const [exp, inc, cats, sets] = await Promise.all([
+        const [exp, inc] = await Promise.all([
           entities.Expense.list('-paid_date', 500),
           entities.Income.list('-received_date', 500),
-          entities.Category.list(),
-          entities.Settings.list(),
         ]);
         setExpenses(exp);
         setIncomes(inc);
-        setCategories(cats);
-        setSettings(sets[0] || null);
       } catch (err) {
-        setLoadError(err);
+        setTxError(err);
       } finally {
-        setLoading(false);
+        setTxLoading(false);
       }
     })();
+  };
+
+  const retryAll = () => {
+    load();
+    catQuery.refetch();
+    setQuery.refetch();
   };
 
   useEffect(load, []);
@@ -272,12 +327,35 @@ export default function Dashboard() {
     if (settings) setLayout(normalizeLayout(settings.dashboard_layout));
   }, [settings]);
 
+  // Best-effort, silent, throttled to roughly once a week per device (via
+  // localStorage) — checks whether the newest snapshot is stale before
+  // writing a new one, so several devices sharing an account don't each
+  // spam their own weekly backup. Never surfaces a failure to the user;
+  // Settings' "Back up now" is the explicit, visible way to do this.
+  useEffect(() => {
+    if (loading) return;
+    const lastCheck = Number(localStorage.getItem(AUTO_BACKUP_CHECK_KEY) || 0);
+    if (Date.now() - lastCheck < AUTO_BACKUP_INTERVAL_MS) return;
+    localStorage.setItem(AUTO_BACKUP_CHECK_KEY, String(Date.now()));
+    (async () => {
+      try {
+        const existing = await listBackupSnapshots();
+        const newest = existing[0]?.created_date;
+        if (!newest || Date.now() - new Date(newest).getTime() > AUTO_BACKUP_INTERVAL_MS) {
+          await createBackupSnapshot();
+        }
+      } catch {
+        // Silent — Settings' manual "Back up now" is the visible fallback.
+      }
+    })();
+  }, [loading]);
+
   const persistLayout = async (next) => {
     setLayout(next);
     if (!settings) return;
     try {
-      const updated = await entities.Settings.update(settings.id, { dashboard_layout: next });
-      setSettings(updated);
+      await entities.Settings.update(settings.id, { dashboard_layout: next });
+      invalidateSettings();
     } catch (err) {
       toast({ title: t('dashboard.couldNotSaveLayout'), description: err.message, variant: 'destructive' });
     }
@@ -434,7 +512,7 @@ export default function Dashboard() {
   }, [settings, loading, budgetPeriodExpenseTotal, budget, periodKey, currency]);
 
   if (loading) return <PageSkeleton rows={4} />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loadError) return <LoadError error={loadError} onRetry={retryAll} />;
 
   const renderWidget = (id) => {
     switch (id) {
@@ -581,6 +659,7 @@ export default function Dashboard() {
   };
 
   const visibleWidgets = layout.filter((w) => w.visible);
+  const isEmpty = expenses.length === 0 && incomes.length === 0;
 
   return (
     <div className="space-y-8">
@@ -590,9 +669,11 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">{monthLabel(thisMonth, lang)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setCustomizing((c) => !c)}>
-            <LayoutGrid className="w-4 h-4 mr-1" /> {t('dashboard.customize')}
-          </Button>
+          {!isEmpty && (
+            <Button variant="outline" onClick={() => setCustomizing((c) => !c)}>
+              <LayoutGrid className="w-4 h-4 mr-1" /> {t('dashboard.customize')}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button><Plus className="w-4 h-4 mr-1" /> {t('common.add')} <ChevronDown className="w-4 h-4 ml-1" /></Button>
@@ -605,68 +686,74 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {uncategorizedCount >= UNCATEGORIZED_ALERT_THRESHOLD && (
-        <Card className="p-4 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 text-amber-600">
-            <Tag className="w-5 h-5 shrink-0" />
-            <p className="text-sm text-foreground">
-              <span className="font-medium">{t('dashboard.uncategorizedBanner', { count: uncategorizedCount })}</span> {t('dashboard.uncategorizedBannerSuffix')}
-            </p>
-          </div>
-          <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
-            <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
-          </Link>
-        </Card>
-      )}
+      {isEmpty ? (
+        <OnboardingGuide />
+      ) : (
+        <>
+          {uncategorizedCount >= UNCATEGORIZED_ALERT_THRESHOLD && (
+            <Card className="p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 text-amber-600">
+                <Tag className="w-5 h-5 shrink-0" />
+                <p className="text-sm text-foreground">
+                  <span className="font-medium">{t('dashboard.uncategorizedBanner', { count: uncategorizedCount })}</span> {t('dashboard.uncategorizedBannerSuffix')}
+                </p>
+              </div>
+              <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
+                <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
+              </Link>
+            </Card>
+          )}
 
-      {customizing && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm font-medium">{t('dashboard.customizePanelTitle')}</p>
-              <p className="text-xs text-muted-foreground">{t('dashboard.customizePanelSubtitle')}</p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>{t('dashboard.done')}</Button>
-          </div>
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="dashboard-widgets">
-              {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
-                  {layout.map((w, index) => (
-                    <Draggable key={w.id} draggableId={w.id} index={index}>
-                      {(dragProvided) => (
-                        <div
-                          ref={dragProvided.innerRef}
-                          {...dragProvided.draggableProps}
-                          className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
-                        >
-                          <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
-                            <GripVertical className="w-4 h-4" />
-                          </span>
-                          <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{t(`dashboard.widgets.${w.id}`)}</span>
-                          <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+          {customizing && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-medium">{t('dashboard.customizePanelTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('dashboard.customizePanelSubtitle')}</p>
                 </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        </Card>
-      )}
+                <Button variant="ghost" size="sm" onClick={() => setCustomizing(false)}>{t('dashboard.done')}</Button>
+              </div>
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="dashboard-widgets">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
+                      {layout.map((w, index) => (
+                        <Draggable key={w.id} draggableId={w.id} index={index}>
+                          {(dragProvided) => (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50"
+                            >
+                              <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
+                                <GripVertical className="w-4 h-4" />
+                              </span>
+                              <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{t(`dashboard.widgets.${w.id}`)}</span>
+                              <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            </Card>
+          )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {visibleWidgets.map((w) => {
-          const def = WIDGET_DEFS.find((d) => d.id === w.id);
-          return (
-            <div key={w.id} className={def?.span === 'full' ? 'sm:col-span-2' : ''}>
-              {renderWidget(w.id)}
-            </div>
-          );
-        })}
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {visibleWidgets.map((w) => {
+              const def = WIDGET_DEFS.find((d) => d.id === w.id);
+              return (
+                <div key={w.id} className={def?.span === 'full' ? 'sm:col-span-2' : ''}>
+                  {renderWidget(w.id)}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
