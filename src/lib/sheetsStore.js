@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { getAccessToken, refreshAccessTokenSilently } from '@/lib/googleAuth';
 
 const SPREADSHEET_TITLE = 'ExpenseTrack Data';
-const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
+const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
 // Sheets/Drive enforce per-minute quotas per user — a burst of calls (e.g.
 // loading several collections in parallel on page load) can trip a 429.
@@ -46,8 +46,8 @@ const sheetsFetch = (path, init) => authedFetch(`https://sheets.googleapis.com/v
 const driveFetch = (path, init) => authedFetch(`https://www.googleapis.com/drive/v3${path}`, init);
 
 const SCHEMAS = {
-  Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date', 'reconciled'],
-  Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled'],
+  Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date', 'reconciled', 'recurring_template_id'],
+  Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled', 'recurring_template_id'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
   RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source'],
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period', 'dashboard_layout'],
@@ -376,6 +376,27 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
         }),
       });
     },
+    // One read + one batched request for N rows, instead of N of each.
+    // Requests are ordered highest-row-first so each deletion lands on the
+    // right row without being thrown off by earlier deletions shifting rows
+    // beneath them within the same batch.
+    async deleteMany(ids) {
+      if (!ids.length) return;
+      const spreadsheetId = await getSpreadsheetId();
+      const rows = await readRows();
+      const idSet = new Set(ids);
+      const matching = rows.filter((r) => idSet.has(r.id)).sort((a, b) => b._row - a._row);
+      if (!matching.length) return;
+      const gid = await getSheetGid(spreadsheetId, sheetName);
+      await sheetsFetch(`/${spreadsheetId}:batchUpdate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          requests: matching.map((r) => ({
+            deleteDimension: { range: { sheetId: gid, dimension: 'ROWS', startIndex: r._row - 1, endIndex: r._row } },
+          })),
+        }),
+      });
+    },
   };
 }
 
@@ -388,12 +409,13 @@ const ExpenseSchema = z.object({
   paid_date: z.string(), category_id: z.string().nullable(), payment_method: z.string(),
   notes: z.string().nullable(), tags: z.array(z.string()), receipt_file_url: z.string().nullable(),
   expense_type: z.string(), period_value: z.number().nullable(), period_unit: z.string().nullable(),
-  amortization_schedule: z.array(z.any()), created_date: z.string(), reconciled: z.boolean(), ...RowMeta,
+  amortization_schedule: z.array(z.any()), created_date: z.string(), reconciled: z.boolean(),
+  recurring_template_id: z.string().nullable(), ...RowMeta,
 });
 const IncomeSchema = z.object({
   id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
   received_date: z.string(), source: z.string(), notes: z.string().nullable(), tags: z.array(z.string()),
-  created_date: z.string(), reconciled: z.boolean(), ...RowMeta,
+  created_date: z.string(), reconciled: z.boolean(), recurring_template_id: z.string().nullable(), ...RowMeta,
 });
 const CategorySchema = z.object({
   id: z.string().min(1), name: z.string(), icon: z.string(), color: z.string(),
@@ -430,14 +452,15 @@ const Expense = makeStore(
     e.category_id || '', e.payment_method || 'card', e.notes || '', JSON.stringify(e.tags || []),
     e.receipt_file_url || '', e.expense_type || 'single', e.period_value ?? '', e.period_unit || '',
     JSON.stringify(e.amortization_schedule || []), e.created_date || new Date().toISOString(), e.reconciled === true,
+    e.recurring_template_id || '',
   ],
-  ([id, description, amount, currency, paid_date, category_id, payment_method, notes, tags, receipt_file_url, expense_type, period_value, period_unit, amortization_schedule, created_date, reconciled]) => ({
+  ([id, description, amount, currency, paid_date, category_id, payment_method, notes, tags, receipt_file_url, expense_type, period_value, period_unit, amortization_schedule, created_date, reconciled, recurring_template_id]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', paid_date: paid_date || '',
     category_id: category_id || null, payment_method: payment_method || 'card', notes: notes || null,
     tags: tags ? JSON.parse(tags) : [], receipt_file_url: receipt_file_url || null, expense_type: expense_type || 'single',
     period_value: period_value !== '' && period_value != null ? Number(period_value) : null, period_unit: period_unit || null,
     amortization_schedule: amortization_schedule ? JSON.parse(amortization_schedule) : [], created_date: created_date || '',
-    reconciled: reconciled === true || reconciled === 'TRUE',
+    reconciled: reconciled === true || reconciled === 'TRUE', recurring_template_id: recurring_template_id || null,
   }),
   ExpenseSchema,
 );
@@ -490,11 +513,12 @@ const Income = makeStore(
   (i) => [
     i.id, i.description || '', i.amount ?? 0, i.currency || 'EUR', i.received_date || '',
     i.source || 'other', i.notes || '', JSON.stringify(i.tags || []), i.created_date || new Date().toISOString(), i.reconciled === true,
+    i.recurring_template_id || '',
   ],
-  ([id, description, amount, currency, received_date, source, notes, tags, created_date, reconciled]) => ({
+  ([id, description, amount, currency, received_date, source, notes, tags, created_date, reconciled, recurring_template_id]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', received_date: received_date || '',
     source: source || 'other', notes: notes || null, tags: tags ? JSON.parse(tags) : [], created_date: created_date || '',
-    reconciled: reconciled === true || reconciled === 'TRUE',
+    reconciled: reconciled === true || reconciled === 'TRUE', recurring_template_id: recurring_template_id || null,
   }),
   IncomeSchema,
 );
@@ -529,6 +553,22 @@ const Goal = makeStore(
 );
 
 export const entities = { Expense, Income, Category, RecurringTemplate, Settings, Debt, Goal };
+
+// Deleting a recurring template alone (RecurringTemplate.delete) never
+// touches the expenses/income it already generated — those are ordinary
+// standalone rows once created. This is the opt-in cascade: also remove
+// every generated row that's actually linked to this template via
+// recurring_template_id. Rows generated before that field existed have no
+// link to find, so they're left alone regardless — there's no reliable way
+// to attribute them back to a specific template after the fact.
+export async function deleteRecurringTemplateWithHistory(template) {
+  const store = template.type === 'income' ? Income : Expense;
+  const all = await store.list();
+  const ids = all.filter((r) => r.recurring_template_id === template.id).map((r) => r.id);
+  await store.deleteMany(ids);
+  await RecurringTemplate.delete(template.id);
+  return ids.length;
+}
 
 // --- Backups: point-in-time snapshots of everything, written into the same
 // spreadsheet (no extra OAuth scope needed). A snapshot's JSON is chunked

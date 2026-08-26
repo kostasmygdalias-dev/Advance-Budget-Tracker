@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { entities } from '@/lib/sheetsStore';
+import { entities, deleteRecurringTemplateWithHistory } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,11 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
@@ -128,6 +133,8 @@ export default function Recurring() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingHistory, setDeletingHistory] = useState(false);
 
   // Creates the actual Expense/Income entry for a due template and advances
   // its next_due_date — repeated in a loop so a template nobody's touched in
@@ -141,6 +148,7 @@ export default function Recurring() {
         received_date: t.next_due_date,
         source: t.source || 'other',
         tags: ['recurring'],
+        recurring_template_id: t.id,
       });
     } else {
       await entities.Expense.create({
@@ -152,6 +160,7 @@ export default function Recurring() {
         expense_type: 'single',
         amortization_schedule: [],
         tags: ['recurring'],
+        recurring_template_id: t.id,
       });
     }
     const next = advanceDate(t.next_due_date, t.frequency, t.custom_interval_days);
@@ -256,9 +265,30 @@ export default function Recurring() {
     load();
   };
 
-  const remove = async (t) => {
+  const removeTemplateOnly = async () => {
+    const t = deleteTarget;
+    setDeleteTarget(null);
     await entities.RecurringTemplate.delete(t.id);
     load();
+  };
+
+  const removeTemplateAndHistory = async () => {
+    const t = deleteTarget;
+    setDeleteTarget(null);
+    setDeletingHistory(true);
+    try {
+      const count = await deleteRecurringTemplateWithHistory(t);
+      toast({
+        title: count === 1
+          ? tr('recurring.deletedWithHistoryOne', { count })
+          : tr('recurring.deletedWithHistoryOther', { count }),
+      });
+      load();
+    } catch (err) {
+      toast({ title: tr('common.couldNotDelete'), description: err.message, variant: 'destructive' });
+    } finally {
+      setDeletingHistory(false);
+    }
   };
 
   if (loading || subLoading) return <PageSkeleton />;
@@ -372,7 +402,7 @@ export default function Recurring() {
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => remove(t)}><Trash2 className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(t)}><Trash2 className="w-4 h-4" /></Button>
               </div>
               {t.active && (
                 <div>
@@ -481,6 +511,33 @@ export default function Recurring() {
           </Card>
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tr('recurring.deleteConfirmTitle', { description: deleteTarget?.description })}</AlertDialogTitle>
+            <AlertDialogDescription>{tr('recurring.deleteConfirmBody')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            <button
+              type="button"
+              onClick={removeTemplateAndHistory}
+              disabled={deletingHistory}
+              className={buttonVariants({ variant: 'destructive', className: 'w-full' })}
+            >
+              {tr('recurring.deleteTemplateAndHistory')}
+            </button>
+            <button
+              type="button"
+              onClick={removeTemplateOnly}
+              className={buttonVariants({ variant: 'outline', className: 'w-full' })}
+            >
+              {tr('recurring.deleteTemplateOnly')}
+            </button>
+            <AlertDialogCancel className="w-full mt-0">{tr('common.cancel')}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
