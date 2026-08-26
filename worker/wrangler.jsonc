@@ -11,7 +11,11 @@
   "vars": {
     // Origins allowed to call this Worker from a browser. Add your
     // production domain here — no trailing slashes.
-    "ALLOWED_ORIGINS": "https://custom.devcoresolutions.gr,http://localhost:5173"
+    "ALLOWED_ORIGINS": "https://custom.devcoresolutions.gr,http://localhost:5173",
+    // Same value as the frontend's VITE_GOOGLE_CLIENT_ID — not secret (it's
+    // already public in the deployed frontend JS), but the Worker needs it
+    // too for the Viber account-linking OAuth code exchange.
+    "GOOGLE_CLIENT_ID": ""
   },
 
   "observability": {
@@ -22,4 +26,8 @@
   // Secrets (never go in this file — set with `wrangler secret put <NAME>`):
   //   STRIPE_SECRET_KEY     — Stripe secret key (sk_live_... or sk_test_...)
   //   STRIPE_WEBHOOK_SECRET — signing secret for the webhook endpoint (whsec_...)
+  //   GOOGLE_CLIENT_SECRET  — client secret for the OAuth client above (Viber linking only)
+  //   VIBER_AUTH_TOKEN      — Viber bot's auth token, from partners.viber.com
+  //   ANTHROPIC_API_KEY     — used to parse Viber chat messages into actions
+  // See VIBER_SETUP.md for the full walkthrough.
 }

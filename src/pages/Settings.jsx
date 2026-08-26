@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History, MessageCircle } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
-import { openBillingPortal } from '@/lib/subscription';
+import { openBillingPortal, startViberConnect, getViberStatus, disconnectViber } from '@/lib/subscription';
 import { parseCsv } from '@/lib/csv';
 import { downloadJson } from '@/lib/exportFile';
 import { useInvalidateSettings } from '@/hooks/useEntities';
@@ -37,6 +37,8 @@ export default function Settings() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [viberConnected, setViberConnected] = useState(null); // null = checking
+  const [viberBusy, setViberBusy] = useState(false);
   const invalidateSettings = useInvalidateSettings();
 
   const loadBackups = () => {
@@ -81,6 +83,24 @@ export default function Settings() {
     } catch (err) {
       toast({ title: 'Could not open billing portal', description: err.message, variant: 'destructive' });
       setPortalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!subActive) return;
+    getViberStatus().then((s) => setViberConnected(s.connected)).catch(() => setViberConnected(false));
+  }, [subActive]);
+
+  const disconnectViberNow = async () => {
+    setViberBusy(true);
+    try {
+      await disconnectViber();
+      setViberConnected(false);
+      toast({ title: t('settings.viberDisconnected') });
+    } catch (err) {
+      toast({ title: t('common.couldNotUpdate'), description: err.message, variant: 'destructive' });
+    } finally {
+      setViberBusy(false);
     }
   };
 
@@ -236,6 +256,42 @@ export default function Settings() {
             </Button>
           ) : (
             upgradeUrl && <Button onClick={() => { window.location.href = upgradeUrl; }}>{t('settings.upgradeToPro')}</Button>
+          )}
+        </Card>
+      )}
+
+      {billingConfigured && !subLoading && (
+        <Card className="p-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${viberConnected ? 'bg-primary' : 'bg-muted'}`}>
+              <MessageCircle className={`w-5 h-5 ${viberConnected ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium flex items-center gap-2">
+                {t('settings.viberTitle')}
+                {!subActive && (
+                  <span className="text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">{t('common.pro')}</span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {!subActive
+                  ? t('settings.viberProOnly')
+                  : viberConnected ? t('settings.viberConnectedDesc') : t('settings.viberNotConnectedDesc')}
+              </p>
+            </div>
+          </div>
+          {subActive ? (
+            viberConnected !== null && (
+              viberConnected ? (
+                <Button variant="outline" onClick={disconnectViberNow} disabled={viberBusy}>
+                  {viberBusy ? t('settings.disconnecting') : t('settings.disconnectViber')}
+                </Button>
+              ) : (
+                <Button onClick={startViberConnect}>{t('settings.connectViber')}</Button>
+              )
+            )
+          ) : (
+            upgradeUrl && <Button variant="outline" onClick={() => { window.location.href = upgradeUrl; }}>{t('settings.upgradeToPro')}</Button>
           )}
         </Card>
       )}

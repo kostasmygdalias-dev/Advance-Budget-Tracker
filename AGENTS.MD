@@ -8,15 +8,22 @@ categories, recurring templates, settings) lives in a spreadsheet in that
 user's own Google Drive, read/written directly from the browser via the
 Sheets/Drive APIs — no database for app data, ever.
 
-The one exception is billing: Recurring templates are a paid feature, and
-`worker/` is a small Cloudflare Worker whose only job is answering "is this
-Google account currently subscribed" — enforced server-side so it can't be
-bypassed by editing the browser. It never sees expense/income data, only a
-Google account id and Stripe subscription status. See `BILLING_SETUP.md`
-for how it's wired up. Don't grow this into a general backend — if a new
-feature seems to need server-side logic beyond "is this account paying,"
-that's a signal to reconsider the approach, not to bolt more onto the
-Worker.
+The exception is `worker/`, a Cloudflare Worker — originally just a
+subscription-status check (Recurring is a Pro feature, enforced
+server-side so it can't be bypassed by editing the browser), now also the
+backend for the Viber bot (also Pro): parses a chat message with an LLM and
+acts on the user's Sheet on their behalf. See `BILLING_SETUP.md` and
+`VIBER_SETUP.md` for how each is wired up.
+
+**The Viber feature is a deliberate, explicitly-approved exception to "no
+shared backend, no stored credentials"** — the Worker permanently stores a
+Google refresh token per user who connects Viber, because acting from a
+chat message (no browser open) requires a standing credential. This was a
+real tradeoff discussion with the user, not a default to repeat casually.
+Don't add another feature that stores user credentials or reads/writes
+user data server-side without raising the same conversation again — most
+new features should still be pure frontend + Google Sheets, exactly like
+before. The Viber path is the carved-out exception, not the new norm.
 
 This project previously ran on the Base44 platform; that dependency has
 been fully removed (no `@base44/sdk`, no Base44-hosted auth or database).
@@ -33,7 +40,7 @@ Do not reintroduce Base44-specific patterns.
   be a database layer.
 - `src/lib/finance.js`: pure calculation helpers (amortization schedules, monthly rollups).
 - `src/lib/subscription.js` / `src/hooks/use-subscription.js`: client for the billing Worker — fails open (full access) when billing env vars aren't set, so this stays inert until `BILLING_SETUP.md` is followed.
-- `worker/`: the Cloudflare Worker backing billing (see Project Context above). Separate `package.json`/deploy from the main app.
+- `worker/`: the Cloudflare Worker backing billing and the Viber bot (see Project Context above). Separate `package.json`/deploy from the main app. `sheetsClient.js`'s column layout must be kept in sync by hand with `src/lib/sheetsStore.js`'s `SCHEMAS` — the Worker can't import frontend code.
 - `vite.config.js`: Vite config, including the `@` → `src/` alias.
 - `.env` / `.env.example`: `VITE_GOOGLE_CLIENT_ID` — see `DEPLOY.md`. `VITE_SUBSCRIPTION_API_URL` / `VITE_STRIPE_PAYMENT_LINK` — see `BILLING_SETUP.md`, both optional.
 

@@ -63,3 +63,36 @@ export async function openBillingPortal() {
   });
   window.location.href = url;
 }
+
+// --- Viber bot (Pro feature) -----------------------------------------
+// Connecting requires a *different* OAuth flow than sign-in: the app's own
+// GIS token-client flow never issues a refresh token, and the Worker needs
+// one to act on the user's Sheet from a chat message with no browser open.
+// This redirects through Google's full consent screen with offline access
+// instead of the silent token-client request used everywhere else in the
+// app — see worker/src/googleOAuth.js for why.
+export function startViberConnect() {
+  const redirectUri = `${API_URL}/oauth/callback`;
+  const scope = [
+    'openid', 'email',
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file',
+  ].join(' ');
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', scope);
+  url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+  window.location.href = url.toString();
+}
+
+export async function getViberStatus() {
+  if (!isBillingConfigured()) return { connected: false };
+  return authedFetch('/viber/status');
+}
+
+export async function disconnectViber() {
+  return authedFetch('/viber/unlink', { method: 'POST' });
+}
