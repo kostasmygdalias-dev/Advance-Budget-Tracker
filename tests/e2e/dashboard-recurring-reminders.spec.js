@@ -37,13 +37,19 @@ const seed = {
 test('Dashboard reminds about active recurring charges due within 7 days, and nothing else', async ({ page }) => {
   await signIn(page, { seed });
 
-  await expect(page.getByText('2 upcoming charges due soon', { exact: true })).toBeVisible();
+  // The bell button itself carries the count as its accessible name (also
+  // shown as a badge) — the item list only renders once its popover opens.
+  const bellButton = page.getByRole('button', { name: '2 upcoming charges due soon' });
+  await expect(bellButton).toBeVisible();
+  await expect(bellButton.getByText('2', { exact: true })).toBeVisible();
 
-  const banner = page.locator('div.rounded-xl', { has: page.getByText('2 upcoming charges due soon', { exact: true }) });
-  await expect(banner.getByText('Due Today', { exact: true })).toBeVisible();
-  await expect(banner.getByText('Due today', { exact: true })).toBeVisible();
-  await expect(banner.getByText('Due Soon', { exact: true })).toBeVisible();
-  await expect(banner.getByText('Due in 3 days', { exact: true })).toBeVisible();
+  await bellButton.click();
+  const popover = page.getByRole('dialog');
+  await expect(popover.getByText('2 upcoming charges due soon', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due Today', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due today', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due Soon', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due in 3 days', { exact: true })).toBeVisible();
 
   await expect(page.getByText('Too Far', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Paused Bill', { exact: true })).toHaveCount(0);
@@ -53,6 +59,5 @@ test('the reminder is Pro-only — a free account never sees it, even with charg
   await signIn(page, { seed, subscriptionActive: false });
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await expect(page.getByText('Due Today', { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/upcoming charge/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /upcoming charge/ })).toHaveCount(0);
 });

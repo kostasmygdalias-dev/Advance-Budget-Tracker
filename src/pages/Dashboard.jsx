@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, LayoutGrid, GripVertical, Tag,
@@ -701,6 +702,38 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">{monthLabel(thisMonth, lang)}</p>
         </div>
         <div className="flex items-center gap-2">
+          {subActive && upcomingRecurring.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className="relative" aria-label={t('dashboard.upcomingRecurringOther', { count: upcomingRecurring.length })}>
+                  <Bell className="w-4 h-4" />
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center">
+                    {upcomingRecurring.length}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="end">
+                <p className="text-sm font-medium mb-2">
+                  {upcomingRecurring.length === 1
+                    ? t('dashboard.upcomingRecurringOne')
+                    : t('dashboard.upcomingRecurringOther', { count: upcomingRecurring.length })}
+                </p>
+                <div className="space-y-1">
+                  {upcomingRecurring.slice(0, 6).map((rt) => (
+                    <div key={rt.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate">{rt.description}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {rt.daysUntil === 0 ? t('dashboard.dueToday')
+                          : rt.daysUntil === 1 ? t('dashboard.dueTomorrow')
+                            : t('dashboard.dueInDays', { days: rt.daysUntil })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <Link to="/recurring" className="text-xs text-muted-foreground underline block mt-2">{t('dashboard.viewRecurring')}</Link>
+              </PopoverContent>
+            </Popover>
+          )}
           {!isEmpty && (
             <Button variant="outline" onClick={() => setCustomizing((c) => !c)}>
               <LayoutGrid className="w-4 h-4 mr-1" /> {t('dashboard.customize')}
@@ -733,32 +766,6 @@ export default function Dashboard() {
               <Link to={`/transactions?type=expense&month=${thisMonth}&category=uncategorized`}>
                 <Button variant="outline" size="sm">{t('dashboard.reviewNow')}</Button>
               </Link>
-            </Card>
-          )}
-
-          {subActive && upcomingRecurring.length > 0 && (
-            <Card className="p-4 space-y-2">
-              <div className="flex items-center gap-3 text-primary">
-                <Bell className="w-5 h-5 shrink-0" />
-                <p className="text-sm font-medium text-foreground">
-                  {upcomingRecurring.length === 1
-                    ? t('dashboard.upcomingRecurringOne')
-                    : t('dashboard.upcomingRecurringOther', { count: upcomingRecurring.length })}
-                </p>
-              </div>
-              <div className="space-y-1 pl-8">
-                {upcomingRecurring.slice(0, 4).map((rt) => (
-                  <div key={rt.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate">{rt.description}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {rt.daysUntil === 0 ? t('dashboard.dueToday')
-                        : rt.daysUntil === 1 ? t('dashboard.dueTomorrow')
-                          : t('dashboard.dueInDays', { days: rt.daysUntil })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <Link to="/recurring" className="text-xs text-muted-foreground underline pl-8 block">{t('dashboard.viewRecurring')}</Link>
             </Card>
           )}
 
