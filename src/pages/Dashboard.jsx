@@ -735,29 +735,32 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
                   {categoryReport.map((d) => {
                     const pct = categoryReportTotal > 0 ? (d.total / categoryReportTotal) * 100 : 0;
                     return (
                       <div key={d.id}>
                         <div className="relative rounded-md overflow-hidden">
                           {/* Proportional fill instead of a plain bullet — same at-a-glance
-                              read as the pie slice, without needing to look left to match colors. */}
+                              read as the pie slice, without needing to look left to match colors.
+                              Costs no horizontal space, unlike a trailing % column would. */}
                           <span
                             className="absolute inset-y-0 left-0 rounded-md"
-                            style={{ width: `${pct}%`, background: d.color, opacity: 0.1 }}
+                            style={{ width: `${pct}%`, background: d.color, opacity: 0.12 }}
                           />
-                          <div className="relative flex items-center gap-2 text-sm px-1 py-0.5">
-                            <IconAvatar icon={(props) => <CategoryIcon name={d.icon} {...props} />} color={d.color} className="w-6 h-6" />
+                          <div className="relative flex items-center gap-2 text-sm px-1.5 py-1">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                             <span className="flex-1 min-w-0 truncate">{d.name}</span>
-                            <span className="text-xs text-muted-foreground tabular-nums">{Math.round(pct)}%</span>
-                            <span className="tabular-nums font-medium">{fmt(d.total, currency)}</span>
+                            <div className="shrink-0 text-right leading-tight">
+                              <div className="tabular-nums font-medium">{fmt(d.total, currency)}</div>
+                              <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}%</div>
+                            </div>
                           </div>
                         </div>
                         {d.children.map((c) => (
-                          <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground ml-8 pl-2 py-0.5 border-l">
+                          <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground ml-4 pl-2 py-0.5 border-l">
                             <span className="flex-1 min-w-0 truncate">{c.name}</span>
-                            <span className="tabular-nums">{fmt(c.total, currency)}</span>
+                            <span className="tabular-nums shrink-0">{fmt(c.total, currency)}</span>
                           </div>
                         ))}
                       </div>
