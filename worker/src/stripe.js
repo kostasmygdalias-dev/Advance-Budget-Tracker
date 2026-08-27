@@ -2,23 +2,7 @@
 // dependency, to keep this Worker small and avoid Node-only APIs the SDK
 // sometimes assumes. Two things live here: verifying that a webhook request
 // genuinely came from Stripe, and making authenticated calls to Stripe's API.
-
-async function hmacSha256(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return crypto.subtle.sign('HMAC', key, enc.encode(message)); // ArrayBuffer
-}
-
-function hexToBytes(hex) {
-  if (typeof hex !== 'string' || hex.length % 2 !== 0) return null;
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    const byte = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-    if (Number.isNaN(byte)) return null;
-    bytes[i] = byte;
-  }
-  return bytes;
-}
+import { verifyHmacHex } from './crypto.js';
 
 // Verifies the `Stripe-Signature` header per Stripe's documented scheme
 // (https://docs.stripe.com/webhooks#verify-manually) and returns the parsed
@@ -34,15 +18,7 @@ export async function verifyStripeWebhook(rawBody, sigHeader, secret, toleranceS
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
   if (!Number.isFinite(age) || age > toleranceSeconds) return null;
 
-  const providedBytes = hexToBytes(v1);
-  if (!providedBytes) return null;
-
-  const expected = await hmacSha256(secret, `${timestamp}.${rawBody}`);
-  // Cloudflare Workers extends SubtleCrypto with timingSafeEqual — a
-  // constant-time comparison isn't expressible as plain JS without risking
-  // the JIT optimizing away the "constant" part, so this uses the runtime's
-  // own implementation rather than hand-rolling one.
-  if (!crypto.subtle.timingSafeEqual(expected, providedBytes)) return null;
+  if (!(await verifyHmacHex(secret, `${timestamp}.${rawBody}`, v1))) return null;
 
   return JSON.parse(rawBody);
 }
