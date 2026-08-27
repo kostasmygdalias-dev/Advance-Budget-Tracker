@@ -475,6 +475,7 @@ export default function Dashboard() {
   }
   categoryReport.sort((a, b) => b.total - a.total);
   categoryReport.forEach((g) => g.children.sort((a, b) => b.total - a.total));
+  const categoryReportTotal = categoryReport.reduce((s, g) => s + g.total, 0);
   const categoryFocusEntries = categoryReport.flatMap((g) => [
     { id: g.id, name: g.name, depth: 0 },
     ...g.children.map((c) => ({ id: c.id, name: c.name, depth: 1 })),
@@ -734,22 +735,34 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {categoryReport.map((d) => (
-                    <div key={d.id} className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: d.color }} />
-                        <span className="flex-1 min-w-0 truncate">{d.name}</span>
-                        <span className="tabular-nums font-medium">{fmt(d.total, currency)}</span>
-                      </div>
-                      {d.children.map((c) => (
-                        <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground ml-5 pl-2 border-l">
-                          <span className="flex-1 min-w-0 truncate">{c.name}</span>
-                          <span className="tabular-nums">{fmt(c.total, currency)}</span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {categoryReport.map((d) => {
+                    const pct = categoryReportTotal > 0 ? (d.total / categoryReportTotal) * 100 : 0;
+                    return (
+                      <div key={d.id}>
+                        <div className="relative rounded-md overflow-hidden">
+                          {/* Proportional fill instead of a plain bullet — same at-a-glance
+                              read as the pie slice, without needing to look left to match colors. */}
+                          <span
+                            className="absolute inset-y-0 left-0 rounded-md"
+                            style={{ width: `${pct}%`, background: d.color, opacity: 0.1 }}
+                          />
+                          <div className="relative flex items-center gap-2 text-sm px-1 py-0.5">
+                            <IconAvatar icon={(props) => <CategoryIcon name={d.icon} {...props} />} color={d.color} className="w-6 h-6" />
+                            <span className="flex-1 min-w-0 truncate">{d.name}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{Math.round(pct)}%</span>
+                            <span className="tabular-nums font-medium">{fmt(d.total, currency)}</span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  ))}
+                        {d.children.map((c) => (
+                          <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground ml-8 pl-2 py-0.5 border-l">
+                            <span className="flex-1 min-w-0 truncate">{c.name}</span>
+                            <span className="tabular-nums">{fmt(c.total, currency)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
