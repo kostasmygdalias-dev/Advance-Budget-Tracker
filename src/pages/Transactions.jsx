@@ -23,7 +23,7 @@ import {
   Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
   Download, ListChecks, X, Tags,
 } from 'lucide-react';
-import { monthLabel, currentMonthStr, fmt } from '@/lib/finance';
+import { monthLabel, currentMonthStr, fmt, todayStr } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
@@ -42,13 +42,9 @@ const getPaymentMethods = (t) => [
   { value: 'other', label: t('common.paymentMethod.other') },
 ];
 
+// Still needed here for shiftMonth below — todayStr itself now comes from
+// finance.js.
 const pad2 = (n) => String(n).padStart(2, '0');
-// Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
-// for users behind/ahead of UTC around midnight (same approach as IncomeForm).
-const todayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-};
 
 function shiftMonth(monthStr, delta) {
   const [y, m] = monthStr.split('-').map(Number);

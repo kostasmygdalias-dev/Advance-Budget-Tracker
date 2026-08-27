@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { calculateAmortizationSchedule, CURRENCIES } from '@/lib/finance';
+import { calculateAmortizationSchedule, CURRENCIES, todayStr } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
@@ -33,14 +33,6 @@ const getUnits = (t) => [
 // user pick one right now (they can refine it later on the Categories page).
 const CATEGORY_COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const NEW_CATEGORY_VALUE = '__new__';
-
-const pad2 = (n) => String(n).padStart(2, '0');
-// Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
-// for users behind/ahead of UTC around midnight.
-const todayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-};
 
 export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   const { toast } = useToast();

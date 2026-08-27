@@ -143,6 +143,13 @@ export function currentMonthStr(ref = new Date()) {
   return toMonthStr(startOfMonth(ref));
 }
 
+// Same as currentMonthStr, but day-precision — independently redeclared in
+// ExpenseForm, IncomeForm, Goals, and Transactions.
+export function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 // Same one-liner was independently redeclared in every page that shows a
 // money amount (Budgets, Dashboard, Goals, Recurring, Reports,
 // Transactions) — shared here instead.
