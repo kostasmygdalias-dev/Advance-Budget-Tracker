@@ -16,7 +16,10 @@ import { CATEGORY_ICON_NAMES } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import AmortizationPreview from './AmortizationPreview';
 
-const getPaymentMethods = (t) => [
+// Also used by Transactions.jsx's payment-method filter — a function, not a
+// static array, for the same reason as IncomeForm's getIncomeSources: each
+// call site translates the labels with its own t().
+export const getPaymentMethods = (t) => [
   { value: 'cash', label: t('common.paymentMethod.cash') },
   { value: 'card', label: t('common.paymentMethod.card') },
   { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },

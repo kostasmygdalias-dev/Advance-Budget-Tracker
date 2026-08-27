@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { monthLabel, currentMonthStr, fmt, todayStr } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
+import { getPaymentMethods } from '@/components/ExpenseForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
@@ -34,13 +35,6 @@ import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
 
 const INCOME_COLOR = '#10b981';
-
-const getPaymentMethods = (t) => [
-  { value: 'cash', label: t('common.paymentMethod.cash') },
-  { value: 'card', label: t('common.paymentMethod.card') },
-  { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },
-  { value: 'other', label: t('common.paymentMethod.other') },
-];
 
 // Still needed here for shiftMonth below — todayStr itself now comes from
 // finance.js.
