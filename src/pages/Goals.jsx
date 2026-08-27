@@ -212,8 +212,8 @@ export default function Goals() {
                       {g.deadline && <p className="text-xs text-muted-foreground">{t('goals.by', { date: g.deadline })}</p>}
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => openEditGoal(g)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ kind: 'goal', id: g.id, label: `"${g.name}"` })}><Trash2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEditGoal(g)} aria-label={t('goals.editGoalButton', { name: g.name })}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ kind: 'goal', id: g.id, label: `"${g.name}"` })} aria-label={t('goals.deleteGoalButton', { name: g.name })}><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </div>
                   <div>
@@ -266,8 +266,8 @@ export default function Goals() {
                       <span className={`font-semibold tabular-nums mr-1 ${theyOwe ? 'text-emerald-600' : 'text-destructive'}`}>
                         {fmt(residual, d.currency)}
                       </span>
-                      <Button variant="ghost" size="icon" onClick={() => openEditDebt(d)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ kind: 'debt', id: d.id, label: d.person })}><Trash2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEditDebt(d)} aria-label={t('goals.editDebtButton', { person: d.person })}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ kind: 'debt', id: d.id, label: d.person })} aria-label={t('goals.deleteDebtButton', { person: d.person })}><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </div>
                   <div>
@@ -308,7 +308,7 @@ export default function Goals() {
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="font-heading font-semibold">{editingGoal.id ? t('goals.editGoal') : t('goals.newGoal')}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setEditingGoal(null)}><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditingGoal(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={saveGoal} className="space-y-4">
               <div className="space-y-2">
@@ -351,7 +351,7 @@ export default function Goals() {
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="font-heading font-semibold">{editingDebt.id ? t('goals.editDebt') : t('goals.newDebt')}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setEditingDebt(null)}><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditingDebt(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={saveDebt} className="space-y-4">
               <div className="space-y-2">
@@ -410,7 +410,7 @@ export default function Goals() {
               <h2 className="font-heading font-semibold">
                 {paymentTarget.kind === 'goal' ? t('goals.addSavings') : t('goals.logARepayment')}
               </h2>
-              <Button variant="ghost" size="icon" onClick={() => setPaymentTarget(null)}><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setPaymentTarget(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-2">
               <Label htmlFor="pay-amount">{t('common.amount')}</Label>

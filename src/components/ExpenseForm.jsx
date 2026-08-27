@@ -349,7 +349,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
         <Card className="p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <h2 className="font-heading font-semibold">{t('categories.newCategory')}</h2>
-            <Button variant="ghost" size="icon" onClick={() => setCreatingCategory(false)}><X className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setCreatingCategory(false)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
           </div>
           <form onSubmit={createCategory} className="space-y-4">
             <div className="space-y-2">

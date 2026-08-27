@@ -38,7 +38,7 @@ export default function AddEditExpense() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link to="/transactions?type=expense&month=all">
-          <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label={t('common.back')}><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">
           {id ? t('addEditExpense.editTitle') : t('addEditExpense.addTitle')}

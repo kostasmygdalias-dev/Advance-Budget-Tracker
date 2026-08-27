@@ -226,15 +226,15 @@ export default function Categories() {
                         </span>
                         <IconPickerButton icon={c.icon} color={c.color} onPick={(ic) => changeIcon(c, ic)} />
                         <span className="font-medium flex-1">{c.name}</span>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(c)} aria-label={t('categories.editCategoryButton', { name: c.name })}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => remove(c)} aria-label={t('categories.deleteCategoryButton', { name: c.name })}><Trash2 className="w-4 h-4" /></Button>
                       </Card>
                       {childrenOf(c.id).map((sub) => (
                         <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6" style={{ borderLeft: `4px solid ${sub.color || '#94a3b8'}` }}>
                           <IconPickerButton icon={sub.icon} color={sub.color} size="w-7 h-7" onPick={(ic) => changeIcon(sub, ic)} />
                           <span className="text-sm flex-1">{sub.name}</span>
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(sub)}><Pencil className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => remove(sub)}><Trash2 className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(sub)} aria-label={t('categories.editCategoryButton', { name: sub.name })}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => remove(sub)} aria-label={t('categories.deleteCategoryButton', { name: sub.name })}><Trash2 className="w-4 h-4" /></Button>
                         </Card>
                       ))}
                     </div>
@@ -252,7 +252,7 @@ export default function Categories() {
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="font-heading font-semibold">{editing.id ? t('categories.editCategory') : t('categories.newCategory')}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditing(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">

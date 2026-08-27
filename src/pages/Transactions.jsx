@@ -632,13 +632,13 @@ export default function Transactions() {
           <div className="flex items-center justify-between gap-3">
             {month ? (
               <>
-                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, -1))}>
+                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, -1))} aria-label={t('transactions.previousMonth')}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <button onClick={() => changeMonth(null)} className="text-sm font-medium hover:underline">
                   {monthLabel(month, lang)}
                 </button>
-                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))}>
+                <Button variant="ghost" size="icon" onClick={() => changeMonth(shiftMonth(month, 1))} aria-label={t('transactions.nextMonth')}>
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </>

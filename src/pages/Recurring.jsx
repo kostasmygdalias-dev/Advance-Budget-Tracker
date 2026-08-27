@@ -400,9 +400,18 @@ export default function Recurring() {
                     {fmt(annualAmount(t), t.currency)}{tr('recurring.perYear')}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => toggleActive(t)}><Pause className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(t)}><Trash2 className="w-4 h-4" /></Button>
+                <Button
+                  variant="ghost" size="icon" onClick={() => toggleActive(t)}
+                  aria-label={t.active ? tr('recurring.pauseTemplateButton', { description: t.description }) : tr('recurring.resumeTemplateButton', { description: t.description })}
+                >
+                  <Pause className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => openEdit(t)} aria-label={tr('recurring.editTemplateButton', { description: t.description })}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(t)} aria-label={tr('recurring.deleteTemplateButton', { description: t.description })}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
               {t.active && (
                 <div>
@@ -431,7 +440,7 @@ export default function Recurring() {
           <Card className="p-5 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="font-heading font-semibold">{editing.id ? tr('recurring.editTemplate') : tr('recurring.newTemplate')}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditing(null)} aria-label={tr('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
