@@ -735,7 +735,7 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
                   {categoryReport.map((d) => {
                     const pct = categoryReportTotal > 0 ? (d.total / categoryReportTotal) * 100 : 0;
                     return (
