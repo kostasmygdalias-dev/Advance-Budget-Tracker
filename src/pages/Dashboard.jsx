@@ -740,21 +740,12 @@ export default function Dashboard() {
                     const pct = categoryReportTotal > 0 ? (d.total / categoryReportTotal) * 100 : 0;
                     return (
                       <div key={d.id}>
-                        <div className="relative rounded-md overflow-hidden">
-                          {/* Proportional fill instead of a plain bullet — same at-a-glance
-                              read as the pie slice, without needing to look left to match colors.
-                              Costs no horizontal space, unlike a trailing % column would. */}
-                          <span
-                            className="absolute inset-y-0 left-0 rounded-md"
-                            style={{ width: `${pct}%`, background: d.color, opacity: 0.12 }}
-                          />
-                          <div className="relative flex items-center gap-2 text-sm px-1.5 py-1">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                            <span className="flex-1 min-w-0 truncate">{d.name}</span>
-                            <div className="shrink-0 text-right leading-tight">
-                              <div className="tabular-nums font-medium">{fmt(d.total, currency)}</div>
-                              <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}%</div>
-                            </div>
+                        <div className="flex items-center gap-2 text-sm px-1.5 py-1">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                          <span className="flex-1 min-w-0 truncate">{d.name}</span>
+                          <div className="shrink-0 text-right leading-tight">
+                            <div className="tabular-nums font-medium">{fmt(d.total, currency)}</div>
+                            <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}%</div>
                           </div>
                         </div>
                         {d.children.map((c) => (

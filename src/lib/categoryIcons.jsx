@@ -78,8 +78,8 @@ export function IconAvatar({ icon: Icon, color, className }) {
   const base = adjustForTheme(color || UNCATEGORIZED_COLOR, isDark);
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full shrink-0 ${className || 'w-9 h-9'}`}
-      style={{ background: base + '22', color: base }}
+      className={`inline-flex items-center justify-center shrink-0 ${className || 'w-9 h-9'}`}
+      style={{ color: base }}
     >
       <Icon className="w-4 h-4" />
     </span>
