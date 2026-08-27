@@ -109,6 +109,7 @@ export default function Settings() {
         cancelled: t('settings.viberErrorCancelled'),
         not_pro: t('settings.viberErrorNotPro'),
         no_refresh_token: t('settings.viberErrorNoRefresh'),
+        rate_limited: t('settings.viberErrorRateLimited'),
       };
       toast({ title: t('settings.viberErrorTitle'), description: messages[error] || t('settings.viberErrorGeneric'), variant: 'destructive' });
     }

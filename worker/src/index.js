@@ -14,6 +14,7 @@ import {
 import { exchangeCodeForTokens, fetchGoogleUserInfo, revokeRefreshToken } from './googleOAuth.js';
 import { verifyViberSignature } from './viber.js';
 import { handleViberMessage } from './viberBot.js';
+import { isRateLimited, clientIp } from './rateLimit.js';
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
@@ -64,6 +65,12 @@ async function handlePortalSession(request, env, cors) {
 }
 
 async function handleWebhook(request, env, cors) {
+  // A signature-only-protected public endpoint still costs an invocation
+  // per request even when the signature is invalid — a coarse per-IP cap
+  // (Stripe itself never comes close to it) blunts anyone hammering it.
+  if (await isRateLimited(env, `stripe-webhook:${clientIp(request)}`, { limit: 60, windowSeconds: 60 })) {
+    return json({ error: 'Too many requests' }, 429, cors);
+  }
   const rawBody = await request.text();
   const sig = request.headers.get('Stripe-Signature');
   const event = await verifyStripeWebhook(rawBody, sig, env.STRIPE_WEBHOOK_SECRET);
@@ -141,6 +148,14 @@ async function handleOAuthCallback(request, env) {
   const returnOrigin = resolveReturnOrigin(env, url.searchParams.get('state'));
   const back = (params) => redirectTo(`${returnOrigin}/#/settings?${new URLSearchParams(params).toString()}`);
 
+  // Public, unauthenticated GET — a real connect attempt hits this once;
+  // this is just a circuit breaker against someone hammering it with junk
+  // `code` values, each of which would otherwise cost a Google token-
+  // exchange call.
+  if (await isRateLimited(env, `oauth-callback:${clientIp(request)}`, { limit: 20, windowSeconds: 300 })) {
+    return back({ viber_error: 'rate_limited' });
+  }
+
   const err = url.searchParams.get('error');
   if (err) return back({ viber_error: 'cancelled' });
 
@@ -178,6 +193,13 @@ async function handleOAuthCallback(request, env) {
 async function handleViberRelink(request, env, cors) {
   const user = await verifyGoogleUser(request);
   if (!user) return json({ error: 'Unauthorized' }, 401, cors);
+  // Already auth-gated (a real cost barrier on its own), but this mints and
+  // writes a fresh KV entry each call, unlike a plain status read — cap it
+  // well above any legitimate use (someone re-requesting a code a couple
+  // times because they missed the 15-minute window).
+  if (await isRateLimited(env, `viber-relink:${user.sub}`, { limit: 5, windowSeconds: 300 })) {
+    return json({ error: 'Too many requests' }, 429, cors);
+  }
   const subscription = await getSubscription(env, user.sub);
   if (subscription?.status !== 'active') return json({ error: 'Pro subscription required' }, 403, cors);
   const refreshToken = await getRefreshToken(env, user.sub);
@@ -197,6 +219,15 @@ async function handleViberWebhook(request, env, cors) {
 
   const event = JSON.parse(rawBody);
   if (event.event === 'message' && event.sender?.id && event.message?.text) {
+    // Per Viber user, not per IP — Viber relays every user's messages from
+    // its own shared infrastructure, so an IP-based limit here would cap
+    // all users collectively instead of isolating one runaway sender. Well
+    // above any real chat pace; this is a circuit breaker (each message
+    // costs an LLM call once the sender is linked and Pro), not a
+    // legitimate-use limiter.
+    if (await isRateLimited(env, `viber-msg:${event.sender.id}`, { limit: 20, windowSeconds: 60 })) {
+      return json({ status: 0, status_message: 'ok' }, 200, cors); // ack to Viber, just skip processing
+    }
     await handleViberMessage(env, { viberUserId: event.sender.id, text: event.message.text });
   }
   return json({ status: 0, status_message: 'ok' }, 200, cors);

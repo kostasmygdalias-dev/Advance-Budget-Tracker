@@ -496,6 +496,7 @@ export const en = {
     viberErrorNotPro: 'This requires an active Pro subscription.',
     viberErrorNoRefresh: "Google didn't grant the access this needs — this usually happens if you'd connected before. Open your Google Account's \"Third-party apps & services\" page, remove ExpenseTrack's access, then try again.",
     viberErrorGeneric: 'Something went wrong — try again.',
+    viberErrorRateLimited: 'Too many attempts — wait a few minutes and try again.',
     preferences: 'Preferences',
     defaultCurrency: 'Default currency',
     budgetPeriod: 'Budget period',
