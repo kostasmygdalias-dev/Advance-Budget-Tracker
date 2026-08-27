@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { calculateAmortizationSchedule } from '@/lib/finance';
+import { calculateAmortizationSchedule, CURRENCIES } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
@@ -22,7 +22,6 @@ const getPaymentMethods = (t) => [
   { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },
   { value: 'other', label: t('common.paymentMethod.other') },
 ];
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 const getUnits = (t) => [
   { value: 'day', label: t('expenseForm.units.day') },
   { value: 'week', label: t('expenseForm.units.week') },

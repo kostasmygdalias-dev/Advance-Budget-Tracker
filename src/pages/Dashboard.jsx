@@ -21,7 +21,7 @@ import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt,
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
-import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { CategoryIcon, IconAvatar, PALETTE } from '@/lib/categoryIcons';
 import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
 import CategoryMultiSelect from '@/components/CategoryMultiSelect';
 import LoadError from '@/components/LoadError';
@@ -31,8 +31,6 @@ import { useLanguage } from '@/lib/i18n';
 const DashboardCustomizePanel = lazy(() => import('@/components/DashboardCustomizePanel'));
 
 const INCOME_COLOR = '#10b981';
-
-const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 
 const AUTO_BACKUP_CHECK_KEY = 'expensetrack_last_auto_backup_check';
 const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;

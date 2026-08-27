@@ -17,6 +17,10 @@ export const CATEGORY_ICON_NAMES = [
   'Sparkles', 'Film', 'Gamepad2', 'Ticket', 'BookOpen', 'HandHeart', 'ShoppingBag', 'Clapperboard',
 ];
 
+// Fallback chart-slice colors for a category with no color of its own —
+// shared by Dashboard's and Reports' category breakdowns.
+export const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+
 const CATEGORY_ICON_MAP = {
   ShoppingCart, Car, Home, Utensils, Plane, Heart, GraduationCap, Briefcase, Gift, Zap,
   Key, Droplet, Wifi, Wrench, Fuel, Bus, ParkingCircle, Shield, Carrot, Coffee, Package,

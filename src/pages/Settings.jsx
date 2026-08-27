@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { entities, createBackupSnapshot, listBackupSnapshots, getBackupSnapshotJson } from '@/lib/sheetsStore';
+import { CURRENCIES } from '@/lib/finance';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,8 +17,6 @@ import { parseCsv } from '@/lib/csv';
 import { downloadJson } from '@/lib/exportFile';
 import { useInvalidateSettings } from '@/hooks/useEntities';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
-
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 export default function Settings() {
   const { toast } = useToast();

@@ -15,12 +15,10 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
-import { parseDateLocal, fmt } from '@/lib/finance';
+import { parseDateLocal, fmt, CURRENCIES } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
-
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const todayStr = () => {

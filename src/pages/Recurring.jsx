@@ -17,7 +17,7 @@ import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
-import { shortMonth, parseDateLocal, fmt } from '@/lib/finance';
+import { shortMonth, parseDateLocal, fmt, CURRENCIES } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
@@ -35,8 +35,6 @@ const getTypes = (t) => [
   { value: 'expense', label: t('common.expense') },
   { value: 'income', label: t('common.income') },
 ];
-
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 function advanceDate(dateStr, frequency, customDays) {
   // Parse as local calendar components, not `new Date(dateStr)` (UTC midnight),

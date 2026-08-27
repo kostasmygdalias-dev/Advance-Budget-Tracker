@@ -3,6 +3,11 @@ const MS_PER_DAY = 86400000;
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+// Every currency picker in the app (ExpenseForm, IncomeForm, Settings,
+// Goals, Recurring) offers the same fixed list — shared here instead of
+// each redeclaring it.
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
+
 // `new Date("YYYY-MM-DD")` parses as UTC midnight; reading it back with local
 // getters (getMonth/getDate) can roll a month-start date back to the previous
 // month for anyone west of UTC. Parse the components directly instead so the

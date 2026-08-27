@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { entities } from '@/lib/sheetsStore';
+import { CURRENCIES } from '@/lib/finance';
 import { useLanguage } from '@/lib/i18n';
 
 // A function, not a static array, so every call site can translate the
@@ -31,7 +32,6 @@ export const INCOME_SOURCE_ICONS = {
   refund: RotateCcw,
   other: CircleDollarSign,
 };
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
 const pad2 = (n) => String(n).padStart(2, '0');
 // Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
