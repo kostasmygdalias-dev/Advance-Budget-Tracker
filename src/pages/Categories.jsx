@@ -11,12 +11,11 @@ import { Plus, Pencil, Trash2, X, GripVertical, Sparkles } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
-import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
+import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR, CATEGORY_COLORS } from '@/lib/categoryIcons';
 import { guessIconForName } from '@/lib/categoryIconGuess';
 import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
 
-const COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const ICONS = CATEGORY_ICON_NAMES;
 
 // Clicking the category's own icon swaps it directly from a grid — no need
@@ -75,7 +74,7 @@ export default function Categories() {
   const openNew = () => {
     setColorTouched(false);
     setIconTouched(false);
-    setEditing({ name: '', icon: ICONS[0], color: COLORS[1], parent_id: '__none__' });
+    setEditing({ name: '', icon: ICONS[0], color: CATEGORY_COLORS[1], parent_id: '__none__' });
   };
   const openEdit = (c) => {
     // Editing an existing category should never auto-change its color/icon.
@@ -274,7 +273,7 @@ export default function Categories() {
               <div className="space-y-2">
                 <Label>{t('categories.color')}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {COLORS.map((col) => (
+                  {CATEGORY_COLORS.map((col) => (
                     <button
                       key={col}
                       type="button"

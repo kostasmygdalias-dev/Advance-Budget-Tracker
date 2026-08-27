@@ -12,7 +12,7 @@ import { calculateAmortizationSchedule, CURRENCIES, todayStr } from '@/lib/finan
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
 import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
-import { CATEGORY_ICON_NAMES } from '@/lib/categoryIcons';
+import { CATEGORY_ICON_NAMES, CATEGORY_COLORS } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import AmortizationPreview from './AmortizationPreview';
 
@@ -31,10 +31,6 @@ const getUnits = (t) => [
   { value: 'month', label: t('expenseForm.units.month') },
   { value: 'year', label: t('expenseForm.units.year') },
 ];
-// Same palette Categories.jsx offers in its color picker — cycled by index
-// so quick-added categories aren't all the same color, without making the
-// user pick one right now (they can refine it later on the Categories page).
-const CATEGORY_COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const NEW_CATEGORY_VALUE = '__new__';
 
 export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {

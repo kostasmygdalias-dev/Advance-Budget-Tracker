@@ -26,6 +26,13 @@ export const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '
 // Categories, Dashboard, Reports, and Transactions.
 export const UNCATEGORIZED_COLOR = '#94a3b8';
 
+// Choices offered for a category's own color — Categories.jsx's picker, and
+// ExpenseForm.jsx cycling through them for a quick-added category. One more
+// color than PALETTE above (deliberately — this is the wider "assign a
+// category a color" set, that one's just the chart-fallback set); shared
+// here rather than each repeating the same 9 hex values.
+export const CATEGORY_COLORS = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
 const CATEGORY_ICON_MAP = {
   ShoppingCart, Car, Home, Utensils, Plane, Heart, GraduationCap, Briefcase, Gift, Zap,
   Key, Droplet, Wifi, Wrench, Fuel, Bus, ParkingCircle, Shield, Carrot, Coffee, Package,
