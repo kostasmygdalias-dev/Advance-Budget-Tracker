@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Wallet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AuthLayout from "@/components/AuthLayout";
@@ -20,7 +20,18 @@ export default function Login() {
   }, [isAuthenticated, navigate, location]);
 
   return (
-    <AuthLayout icon={Wallet} title="ExpenseTrack" subtitle={t('login.subtitle')}>
+    <AuthLayout
+      icon={Wallet}
+      title="ExpenseTrack"
+      subtitle={t('login.subtitle')}
+      footer={(
+        <>
+          <Link to="/privacy" className="underline hover:text-foreground">{t('common.privacyPolicy')}</Link>
+          {' · '}
+          <Link to="/terms" className="underline hover:text-foreground">{t('common.termsOfService')}</Link>
+        </>
+      )}
+    >
       {authError && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {authError.message}

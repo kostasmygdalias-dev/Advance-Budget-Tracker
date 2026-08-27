@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History, MessageCircle } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History, MessageCircle, Mail } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -17,6 +17,8 @@ import { parseCsv } from '@/lib/csv';
 import { downloadJson } from '@/lib/exportFile';
 import { useInvalidateSettings } from '@/hooks/useEntities';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
+
+const SUPPORT_EMAIL = 'kostas_mygdalias@hotmail.com';
 
 export default function Settings() {
   const { toast } = useToast();
@@ -463,6 +465,14 @@ export default function Settings() {
             <BarChart3 className="w-4 h-4 mr-1" /> {t('settings.viewReports')}
           </Button>
         </Link>
+      </div>
+
+      <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground pt-2">
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
+          <Mail className="w-3.5 h-3.5" /> {t('common.contactSupport')}
+        </a>
+        <Link to="/privacy" className="underline hover:text-foreground">{t('common.privacyPolicy')}</Link>
+        <Link to="/terms" className="underline hover:text-foreground">{t('common.termsOfService')}</Link>
       </div>
     </div>
   );

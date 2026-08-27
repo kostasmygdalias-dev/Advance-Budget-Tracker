@@ -26,6 +26,8 @@ const Budgets = lazy(() => import('@/pages/Budgets'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 const Upgrade = lazy(() => import('@/pages/Upgrade'));
 const Login = lazy(() => import('@/pages/Login'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const Terms = lazy(() => import('@/pages/Terms'));
 
 const PageSpinner = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -49,6 +51,8 @@ const AuthenticatedApp = () => {
       <Suspense fallback={<PageSpinner />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
