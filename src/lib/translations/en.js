@@ -527,5 +527,11 @@ export const en = {
     noBackupsYet: 'No backups yet.',
     downloadBackup: 'Download',
     couldNotDownloadBackup: 'Could not download backup',
+    restoreBackup: 'Restore',
+    restoring: 'Restoring…',
+    confirmRestoreTitle: 'Restore this backup?',
+    confirmRestoreDescription: 'This replaces all current expenses, income, categories, recurring templates, debts, goals, and settings with what was saved on {{date}}. Anything added or changed since then will be lost. This cannot be undone.',
+    restoreComplete: 'Backup restored',
+    couldNotRestoreBackup: 'Could not restore backup',
   },
 };

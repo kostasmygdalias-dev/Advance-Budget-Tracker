@@ -77,6 +77,14 @@ async function handleSheetsRequest(route, workbook) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
   }
 
+  // POST .../values/{sheet}!A2:{col}:clear — replaceAll()'s wipe step.
+  // Empties every data row but leaves the header (array index 0) alone,
+  // matching the real API (it clears cell values, it doesn't delete rows).
+  if (method === 'POST' && pathname.endsWith(':clear')) {
+    if (sheet) sheet.rows = sheet.rows.slice(0, 1);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
+  }
+
   if (method === 'PUT') {
     const rowMatch = pathname.match(/!A(\d+):/);
     const body = request.postDataJSON();

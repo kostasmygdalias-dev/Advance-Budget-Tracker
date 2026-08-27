@@ -397,6 +397,23 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
         }),
       });
     },
+    // Wipes every existing data row and writes `records` verbatim in their
+    // place — unlike create(), it does NOT mint a fresh id/created_date, so
+    // cross-references between collections (category_id, parent_id,
+    // recurring_template_id) survive exactly as given. Used only by
+    // restoreBackupSnapshot(), where those references must resolve against
+    // the other collections being restored alongside this one. :clear only
+    // empties cell values (the header row and sheet structure are untouched),
+    // so a mid-failure retry is safe — it never shifts or deletes rows.
+    async replaceAll(records) {
+      const spreadsheetId = await getSpreadsheetId();
+      await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A2:${lastCol}:clear`, { method: 'POST' });
+      if (!records.length) return;
+      await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A1:append?valueInputOption=RAW`, {
+        method: 'POST',
+        body: JSON.stringify({ values: records.map(toRow) }),
+      });
+    },
   };
 }
 
@@ -642,6 +659,29 @@ export async function getBackupSnapshotJson(id) {
     .filter(({ row }) => row[0] === id)
     .sort((a, b) => Number(a.row[2]) - Number(b.row[2]));
   return chunks.map(({ row }) => row[4] || '').join('');
+}
+
+// Replaces every collection's current contents with a snapshot's — the
+// destructive counterpart to createBackupSnapshot(). Each collection's
+// replaceAll() preserves the snapshot's original ids/created_dates exactly,
+// which is what keeps cross-references (expense.category_id,
+// expense.recurring_template_id, category.parent_id, ...) valid across the
+// restore. The Backups sheet itself is untouched, so the snapshot just
+// restored (and any others) stays available afterwards.
+export async function restoreBackupSnapshot(id) {
+  const json = await getBackupSnapshotJson(id);
+  if (!json) throw new Error('Backup not found');
+  const data = JSON.parse(json);
+  if (data.version !== 1) throw new Error('Unsupported backup version');
+  await Promise.all([
+    Expense.replaceAll(data.expenses || []),
+    Income.replaceAll(data.incomes || []),
+    Category.replaceAll(data.categories || []),
+    RecurringTemplate.replaceAll(data.recurring || []),
+    Settings.replaceAll(data.settings || []),
+    Debt.replaceAll(data.debts || []),
+    Goal.replaceAll(data.goals || []),
+  ]);
 }
 
 // Multipart upload to the user's Drive (drive.file scope: the app can only

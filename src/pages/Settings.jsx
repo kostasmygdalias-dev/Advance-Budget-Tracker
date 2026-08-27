@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { entities, createBackupSnapshot, listBackupSnapshots, getBackupSnapshotJson } from '@/lib/sheetsStore';
+import { entities, createBackupSnapshot, listBackupSnapshots, getBackupSnapshotJson, restoreBackupSnapshot } from '@/lib/sheetsStore';
 import { CURRENCIES } from '@/lib/finance';
 import { useAuth } from '@/lib/AuthContext';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History, MessageCircle, Mail } from 'lucide-react';
+import { Save, Download, Upload, CheckCircle2, Crown, FolderTree, BarChart3, Wallet, History, RotateCcw, MessageCircle, Mail } from 'lucide-react';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -38,6 +42,8 @@ export default function Settings() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [restoring, setRestoring] = useState(false);
   const [viberStatus, setViberStatus] = useState(null); // { connected, hasGoogleAuth } | null = checking
   const [viberBusy, setViberBusy] = useState(false);
   const [viberLinkCode, setViberLinkCode] = useState(null);
@@ -53,6 +59,34 @@ export default function Settings() {
   };
 
   useEffect(loadBackups, []);
+
+  // A full reload is deliberate: restore rewrites every collection
+  // (expenses, income, categories, recurring, debts, goals, settings), and
+  // most of those are fetched directly by each page rather than through
+  // React Query's cache — a reload is the only way to guarantee nothing
+  // anywhere in the app is left showing pre-restore data. The flag survives
+  // the reload (sessionStorage) so the success toast can still be shown once
+  // the fresh page has mounted.
+  useEffect(() => {
+    if (sessionStorage.getItem('expensetrack_just_restored')) {
+      sessionStorage.removeItem('expensetrack_just_restored');
+      toast({ title: t('settings.restoreComplete') });
+    }
+  }, []);
+
+  const confirmRestore = async () => {
+    if (!restoreTarget) return;
+    setRestoring(true);
+    try {
+      await restoreBackupSnapshot(restoreTarget.id);
+      sessionStorage.setItem('expensetrack_just_restored', '1');
+      window.location.reload();
+    } catch (err) {
+      toast({ title: t('settings.couldNotRestoreBackup'), description: err.message, variant: 'destructive' });
+      setRestoring(false);
+      setRestoreTarget(null);
+    }
+  };
 
   const backupNow = async () => {
     setBackingUp(true);
@@ -434,9 +468,14 @@ export default function Settings() {
               {backups.map((b) => (
                 <div key={b.id} className="flex items-center justify-between gap-3 text-sm py-1.5 border-b last:border-0">
                   <span className="tabular-nums">{new Date(b.created_date).toLocaleString(lang === 'el' ? 'el-GR' : undefined)}</span>
-                  <Button variant="ghost" size="sm" onClick={() => downloadBackup(b.id, b.created_date)} disabled={downloadingId === b.id}>
-                    <Download className="w-3.5 h-3.5 mr-1" /> {t('settings.downloadBackup')}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => downloadBackup(b.id, b.created_date)} disabled={downloadingId === b.id}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> {t('settings.downloadBackup')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setRestoreTarget(b)}>
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> {t('settings.restoreBackup')}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -475,6 +514,25 @@ export default function Settings() {
         <Link to="/privacy" className="underline hover:text-foreground">{t('common.privacyPolicy')}</Link>
         <Link to="/terms" className="underline hover:text-foreground">{t('common.termsOfService')}</Link>
       </div>
+
+      <AlertDialog open={!!restoreTarget} onOpenChange={(open) => !open && !restoring && setRestoreTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('settings.confirmRestoreTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreTarget && t('settings.confirmRestoreDescription', {
+                date: new Date(restoreTarget.created_date).toLocaleString(lang === 'el' ? 'el-GR' : undefined),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRestore} disabled={restoring} className={buttonVariants({ variant: 'destructive' })}>
+              {restoring ? t('settings.restoring') : t('settings.restoreBackup')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
