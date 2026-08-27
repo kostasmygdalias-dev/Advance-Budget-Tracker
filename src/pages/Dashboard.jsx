@@ -22,7 +22,8 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
-import { amountIncludingChildren } from '@/lib/categoryTree';
+import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
+import CategoryMultiSelect from '@/components/CategoryMultiSelect';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -297,6 +298,7 @@ export default function Dashboard() {
   const [txError, setTxError] = useState(null);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [customizing, setCustomizing] = useState(false);
+  const [focusCategoryIds, setFocusCategoryIds] = useState([]);
   const { active: subActive } = useSubscription();
   const [recurringTemplates, setRecurringTemplates] = useState([]);
 
@@ -442,20 +444,82 @@ export default function Dashboard() {
   const lastMonthIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, lastMonth) ? i.amount || 0 : 0), 0);
 
   const byCategory = {};
+  const byCategoryCounts = {};
   expenses.forEach((e) => {
     if ((e.currency || 'EUR') !== currency) return;
     const contrib = getMonthlyContribution(e, thisMonth);
     if (contrib <= 0) return;
     const key = e.category_id || 'uncategorized';
     byCategory[key] = (byCategory[key] || 0) + contrib;
+    byCategoryCounts[key] = (byCategoryCounts[key] || 0) + 1;
   });
-  const pieData = Object.entries(byCategory)
-    .map(([id, value]) => ({
-      name: id === 'uncategorized' ? t('transactions.uncategorized') : (catMap[id]?.name || t('common.categoryFallback')),
-      value: Math.round(value * 100) / 100,
-      color: id === 'uncategorized' ? '#94a3b8' : (catMap[id]?.color || PALETTE[0]),
-    }))
-    .sort((a, b) => b.value - a.value);
+
+  // Same parent-rollup + multi-select drill-down as Reports' "Spending by
+  // category" card (see CategoryMultiSelect there) — this month only,
+  // instead of a date range, since that's this widget's whole point.
+  const categoryReport = [];
+  let currentCategoryGroup = null;
+  flattenCategoryTree(categories).forEach((c) => {
+    if (c.depth === 0) {
+      const total = amountIncludingChildren(c.id, byCategory, categories);
+      currentCategoryGroup = total > 0 ? {
+        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
+        total, count: byCategoryCounts[c.id] || 0, children: [],
+      } : null;
+      if (currentCategoryGroup) categoryReport.push(currentCategoryGroup);
+    } else if (currentCategoryGroup && byCategory[c.id] > 0) {
+      currentCategoryGroup.count += byCategoryCounts[c.id] || 0;
+      currentCategoryGroup.children.push({
+        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
+        total: byCategory[c.id], count: byCategoryCounts[c.id] || 0,
+      });
+    }
+  });
+  if (byCategory.uncategorized > 0) {
+    categoryReport.push({
+      id: 'uncategorized', name: t('transactions.uncategorized'), color: '#94a3b8', icon: null,
+      total: byCategory.uncategorized, count: byCategoryCounts.uncategorized || 0, children: [],
+    });
+  }
+  categoryReport.sort((a, b) => b.total - a.total);
+  categoryReport.forEach((g) => g.children.sort((a, b) => b.total - a.total));
+  const categoryFocusEntries = categoryReport.flatMap((g) => [
+    { id: g.id, name: g.name, depth: 0 },
+    ...g.children.map((c) => ({ id: c.id, name: c.name, depth: 1 })),
+  ]);
+
+  const categoryFocusIdSet = new Set();
+  focusCategoryIds.forEach((id) => {
+    const group = categoryReport.find((g) => g.id === id);
+    if (group) {
+      categoryFocusIdSet.add(group.id);
+      group.children.forEach((c) => categoryFocusIdSet.add(c.id));
+    } else {
+      categoryFocusIdSet.add(id);
+    }
+  });
+  const categoryFocusSelected = categoryReport.flatMap((g) => [g, ...g.children]).filter((e) => focusCategoryIds.includes(e.id));
+  const categoryFocusEntry = categoryFocusIdSet.size > 0 ? {
+    name: categoryFocusSelected.length === 1 ? categoryFocusSelected[0].name : t('reports.categoriesSelected', { count: categoryFocusSelected.length }),
+    icon: categoryFocusSelected.length === 1 ? categoryFocusSelected[0].icon : null,
+    color: categoryFocusSelected.length === 1 ? categoryFocusSelected[0].color : PALETTE[0],
+    total: [...categoryFocusIdSet].reduce((s, id) => s + (byCategory[id] || 0), 0),
+  } : null;
+  const categoryFocusHasGroup = focusCategoryIds.some((id) => categoryReport.some((g) => g.id === id));
+  const categoryFocusRows = (() => {
+    const rows = [];
+    const seen = new Set();
+    focusCategoryIds.forEach((id) => {
+      const group = categoryReport.find((g) => g.id === id);
+      if (group) {
+        group.children.forEach((c) => { if (!seen.has(c.id)) { rows.push(c); seen.add(c.id); } });
+      } else {
+        const child = categoryReport.flatMap((g) => g.children).find((c) => c.id === id);
+        if (child && !seen.has(child.id)) { rows.push(child); seen.add(child.id); }
+      }
+    });
+    return rows.sort((a, b) => b.total - a.total);
+  })();
 
   const categoryBudgetRows = Object.entries(settings?.budget_per_category || {})
     .filter(([, amt]) => amt > 0)
@@ -623,29 +687,75 @@ export default function Dashboard() {
       case 'categoryPie':
         return (
           <Card className="p-5 h-full">
-            <p className="text-sm font-medium mb-4">{t('dashboard.spendingByCategoryFor', { month: monthLabel(thisMonth, lang) })}</p>
-            {pieData.length === 0 ? (
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <p className="text-sm font-medium">{t('dashboard.spendingByCategoryFor', { month: monthLabel(thisMonth, lang) })}</p>
+              {categoryReport.length > 0 && (
+                <CategoryMultiSelect
+                  entries={categoryFocusEntries}
+                  selectedIds={focusCategoryIds}
+                  onToggle={(id) => setFocusCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+                  onClear={() => setFocusCategoryIds([])}
+                  allLabel={t('reports.allCategories')}
+                  selectedLabel={(count) => t('reports.categoriesSelected', { count })}
+                  clearLabel={t('reports.clearSelection')}
+                  triggerClassName="h-8 text-xs w-40 justify-between font-normal"
+                />
+              )}
+            </div>
+            {categoryReport.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('dashboard.noSpendingThisMonth')}</p>
+            ) : categoryFocusEntry ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <IconAvatar icon={(props) => <CategoryIcon name={categoryFocusEntry.icon} {...props} />} color={categoryFocusEntry.color} className="w-10 h-10" />
+                  <div>
+                    <p className="text-sm font-medium">{categoryFocusEntry.name}</p>
+                    <p className="text-2xl font-heading font-semibold tabular-nums">{fmt(categoryFocusEntry.total, currency)}</p>
+                  </div>
+                </div>
+                {categoryFocusHasGroup && (
+                  categoryFocusRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t('reports.noSubcategorySpending')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {categoryFocusRows.map((c) => (
+                        <div key={c.id} className="flex items-center gap-3 text-sm">
+                          <IconAvatar icon={(props) => <CategoryIcon name={c.icon} {...props} />} color={c.color} className="w-7 h-7" />
+                          <span className="flex-1 min-w-0 truncate">{c.name}</span>
+                          <span className="text-xs text-muted-foreground">{c.count}×</span>
+                          <span className="tabular-nums font-medium w-20 text-right">{fmt(c.total, currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4 items-center">
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                        {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      <Pie data={categoryReport} dataKey="total" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                        {categoryReport.map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Pie>
                       <Tooltip formatter={(v) => fmt(v, currency)} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2">
-                  {pieData.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
-                        {d.name}
-                      </span>
-                      <span className="tabular-nums font-medium">{fmt(d.value, currency)}</span>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {categoryReport.map((d) => (
+                    <div key={d.id} className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: d.color }} />
+                        <span className="flex-1 min-w-0 truncate">{d.name}</span>
+                        <span className="tabular-nums font-medium">{fmt(d.total, currency)}</span>
+                      </div>
+                      {d.children.map((c) => (
+                        <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground ml-5 pl-2 border-l">
+                          <span className="flex-1 min-w-0 truncate">{c.name}</span>
+                          <span className="tabular-nums">{fmt(c.total, currency)}</span>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
