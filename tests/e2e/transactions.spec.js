@@ -5,6 +5,11 @@ test('adding an expense shows it in Transactions, and a deleted row can be undon
   await signIn(page);
 
   await page.getByRole('link', { name: 'Transactions' }).click();
+  // Wait for the page to actually land before opening its own Add menu —
+  // Dashboard has an identically-labeled Add button/menu, and react-router
+  // v7's default startTransition-wrapped navigation leaves a brief window
+  // where Dashboard's is still the one in the DOM.
+  await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Expense' }).click();
   await expect(page).toHaveURL(/#\/expenses\/new$/);
