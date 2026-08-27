@@ -41,9 +41,20 @@ export async function deleteRefreshToken(env, sub) {
   await env.SUBSCRIPTIONS.delete(refreshKey(sub));
 }
 
+// 32 chars (no 0/O/1/I — easy to misread when someone's copying this off a
+// screen into Viber) mapped one-to-one from random bytes, so every code is
+// exactly 6 characters drawn uniformly from a fixed alphabet — 30 bits of
+// entropy. The previous version built codes by base36-encoding each byte
+// and slicing the result to 6 chars: byte values needing only one base36
+// digit (0-35) versus two (36-255) made both the code's length and its
+// character distribution inconsistent, and in the worst case discarded a
+// byte's randomness entirely once the slice already had 6 characters.
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_LENGTH = 6;
+
 export async function createLinkCode(env, sub) {
-  const code = Array.from(crypto.getRandomValues(new Uint8Array(4)))
-    .map((b) => b.toString(36)).join('').slice(0, 6).toUpperCase();
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+  const code = Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
   await env.SUBSCRIPTIONS.put(linkCodeKey(code), sub, { expirationTtl: 900 }); // 15 minutes
   return code;
 }

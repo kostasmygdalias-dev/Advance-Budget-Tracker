@@ -51,7 +51,10 @@ async function handlePortalSession(request, env, cors) {
   if (!sub?.stripeCustomerId) return json({ error: 'No subscription found for this account' }, 400, cors);
 
   const body = await request.json().catch(() => ({}));
-  const returnUrl = body.returnUrl || allowedOriginsList(env)[0] || '';
+  // Caller-supplied like `state` on the OAuth callback below — only ever
+  // honor it if it actually points back at a configured origin, or this
+  // becomes an open redirect off the end of a real Stripe checkout.
+  const returnUrl = isAllowedReturnUrl(env, body.returnUrl) ? body.returnUrl : (allowedOriginsList(env)[0] || '');
 
   const session = await stripeRequest(env, 'billing_portal/sessions', {
     customer: sub.stripeCustomerId,
@@ -102,6 +105,15 @@ async function handleWebhook(request, env, cors) {
 
 function allowedOriginsList(env) {
   return (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+// Unlike `state` below (a bare origin), this checks a full URL — Settings.jsx
+// sends back `${origin}/#/settings` — so it must match as a prefix, not
+// exact equality, while still rejecting anything not actually rooted at a
+// configured origin.
+function isAllowedReturnUrl(env, url) {
+  if (!url) return false;
+  return allowedOriginsList(env).some((origin) => url === origin || url.startsWith(`${origin}/`) || url.startsWith(`${origin}#`));
 }
 
 // `state` round-trips through Google unmodified, so it's attacker-influenceable
@@ -249,7 +261,14 @@ export default {
       }
       return json({ error: 'Not found' }, 404, cors);
     } catch (err) {
-      return json({ error: err.message || 'Internal error' }, 500, cors);
+      // Every intentional client-facing error is already returned directly
+      // by its handler above (wrong status, clear message) — anything that
+      // lands here is unexpected, and its message may echo raw text from
+      // Stripe/Google/Viber's own API responses. Log the real detail
+      // server-side (visible via `wrangler tail`) and keep the client
+      // response generic rather than forwarding whatever it says verbatim.
+      console.error('Unhandled Worker error:', err);
+      return json({ error: 'Internal error' }, 500, cors);
     }
   },
 };
