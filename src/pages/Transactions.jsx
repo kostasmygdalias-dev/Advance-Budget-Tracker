@@ -26,7 +26,7 @@ import {
 import { monthLabel, currentMonthStr, fmt, todayStr } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { getPaymentMethods } from '@/components/ExpenseForm';
-import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
 import { useCategoriesQuery } from '@/hooks/useEntities';
@@ -53,7 +53,7 @@ function shiftMonth(monthStr, delta) {
 function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const color = cat?.color || '#94a3b8';
+  const color = cat?.color || UNCATEGORIZED_COLOR;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -68,7 +68,7 @@ function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
             onClick={() => { onPick(null); setOpen(false); }}
             className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors ${!categoryId ? 'bg-muted' : ''}`}
           >
-            <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color="#94a3b8" className="w-6 h-6" />
+            <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color={UNCATEGORIZED_COLOR} className="w-6 h-6" />
             {t('transactions.uncategorized')}
           </button>
           {flattenCategoryTree(categories).map((c) => (
@@ -91,7 +91,7 @@ function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
 function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, onToggleReconciled, selectMode, selected, onToggleSelect }) {
   const { t, lang } = useLanguage();
   const PAYMENT_METHODS = getPaymentMethods(t);
-  const color = cat?.color || '#94a3b8';
+  const color = cat?.color || UNCATEGORIZED_COLOR;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
@@ -569,7 +569,7 @@ export default function Transactions() {
                         onClick={() => bulkRecategorize(null)}
                         className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
                       >
-                        <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color="#94a3b8" className="w-6 h-6" />
+                        <IconAvatar icon={(props) => <CategoryIcon name={null} {...props} />} color={UNCATEGORIZED_COLOR} className="w-6 h-6" />
                         {t('transactions.uncategorized')}
                       </button>
                       {flattenCategoryTree(categories).map((c) => (

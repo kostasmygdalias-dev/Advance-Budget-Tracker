@@ -21,7 +21,7 @@ import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt,
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
-import { CategoryIcon, IconAvatar, PALETTE } from '@/lib/categoryIcons';
+import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
 import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
 import CategoryMultiSelect from '@/components/CategoryMultiSelect';
 import LoadError from '@/components/LoadError';
@@ -179,7 +179,7 @@ function RecentTransactions({ rows, catMap }) {
             {rows.map((row) => {
               const isIncome = row._type === 'income';
               const cat = !isIncome && row.category_id ? catMap[row.category_id] : null;
-              const color = isIncome ? INCOME_COLOR : (cat?.color || '#94a3b8');
+              const color = isIncome ? INCOME_COLOR : (cat?.color || UNCATEGORIZED_COLOR);
               const Icon = isIncome ? (INCOME_SOURCE_ICONS[row.source] || INCOME_SOURCE_ICONS.other) : null;
               return (
                 <div key={row.id} className="flex items-center gap-3">
@@ -469,7 +469,7 @@ export default function Dashboard() {
   });
   if (byCategory.uncategorized > 0) {
     categoryReport.push({
-      id: 'uncategorized', name: t('transactions.uncategorized'), color: '#94a3b8', icon: null,
+      id: 'uncategorized', name: t('transactions.uncategorized'), color: UNCATEGORIZED_COLOR, icon: null,
       total: byCategory.uncategorized, count: byCategoryCounts.uncategorized || 0, children: [],
     });
   }
@@ -521,7 +521,7 @@ export default function Dashboard() {
         id: catId,
         name: catId === 'uncategorized' ? t('transactions.uncategorized') : (catMap[catId]?.name || t('common.categoryFallback')),
         icon: catMap[catId]?.icon,
-        color: catId === 'uncategorized' ? '#94a3b8' : (catMap[catId]?.color || PALETTE[0]),
+        color: catId === 'uncategorized' ? UNCATEGORIZED_COLOR : (catMap[catId]?.color || PALETTE[0]),
         spent, budget: amt,
         pct: amt > 0 ? (spent / amt) * 100 : 0,
       };

@@ -11,7 +11,7 @@ import { Plus, Pencil, Trash2, X, GripVertical, Sparkles } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
-import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
+import { CATEGORY_ICON_NAMES, CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
 import { guessIconForName } from '@/lib/categoryIconGuess';
 import { useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
@@ -220,7 +220,7 @@ export default function Categories() {
                 <Draggable key={c.id} draggableId={c.id} index={index}>
                   {(dragProvided) => (
                     <div className="space-y-1" ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                      <Card className="p-3 flex items-center gap-3" style={{ borderLeft: `4px solid ${c.color || '#94a3b8'}` }}>
+                      <Card className="p-3 flex items-center gap-3" style={{ borderLeft: `4px solid ${c.color || UNCATEGORIZED_COLOR}` }}>
                         <span {...dragProvided.dragHandleProps} className="text-muted-foreground cursor-grab">
                           <GripVertical className="w-4 h-4" />
                         </span>
@@ -230,7 +230,7 @@ export default function Categories() {
                         <Button variant="ghost" size="icon" onClick={() => remove(c)} aria-label={t('categories.deleteCategoryButton', { name: c.name })}><Trash2 className="w-4 h-4" /></Button>
                       </Card>
                       {childrenOf(c.id).map((sub) => (
-                        <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6" style={{ borderLeft: `4px solid ${sub.color || '#94a3b8'}` }}>
+                        <Card key={sub.id} className="p-3 flex items-center gap-3 ml-6" style={{ borderLeft: `4px solid ${sub.color || UNCATEGORIZED_COLOR}` }}>
                           <IconPickerButton icon={sub.icon} color={sub.color} size="w-7 h-7" onPick={(ic) => changeIcon(sub, ic)} />
                           <span className="text-sm flex-1">{sub.name}</span>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(sub)} aria-label={t('categories.editCategoryButton', { name: sub.name })}><Pencil className="w-4 h-4" /></Button>

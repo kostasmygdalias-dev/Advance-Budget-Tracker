@@ -15,7 +15,7 @@ import {
   getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths, fmt,
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
-import { CategoryIcon, IconAvatar, PALETTE } from '@/lib/categoryIcons';
+import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
 import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
 import { useCategoriesQuery, useSettingsQuery } from '@/hooks/useEntities';
@@ -189,7 +189,7 @@ export default function Reports() {
   });
   if (categoryTotals.uncategorized > 0) {
     categoryReport.push({
-      id: 'uncategorized', name: t('transactions.uncategorized'), color: '#94a3b8', icon: null,
+      id: 'uncategorized', name: t('transactions.uncategorized'), color: UNCATEGORIZED_COLOR, icon: null,
       total: categoryTotals.uncategorized, count: categoryCounts.uncategorized || 0, children: [],
     });
   }
@@ -580,7 +580,7 @@ export default function Reports() {
           <div className="space-y-2">
             {biggestExpenses.map((e) => {
               const cat = e.category_id ? catMap[e.category_id] : null;
-              const color = cat?.color || '#94a3b8';
+              const color = cat?.color || UNCATEGORIZED_COLOR;
               return (
                 <div key={e.id} className="flex items-center gap-3">
                   <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} className="w-8 h-8" />

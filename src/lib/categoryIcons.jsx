@@ -21,6 +21,11 @@ export const CATEGORY_ICON_NAMES = [
 // shared by Dashboard's and Reports' category breakdowns.
 export const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 
+// The color shown for "Uncategorized" and as a fallback when a category
+// somehow has none — same literal was previously repeated inline in
+// Categories, Dashboard, Reports, and Transactions.
+export const UNCATEGORIZED_COLOR = '#94a3b8';
+
 const CATEGORY_ICON_MAP = {
   ShoppingCart, Car, Home, Utensils, Plane, Heart, GraduationCap, Briefcase, Gift, Zap,
   Key, Droplet, Wifi, Wrench, Fuel, Bus, ParkingCircle, Shield, Carrot, Coffee, Package,
@@ -63,7 +68,7 @@ function adjustForTheme(color, isDark) {
 
 export function IconAvatar({ icon: Icon, color, className }) {
   const isDark = useIsDark();
-  const base = adjustForTheme(color || '#94a3b8', isDark);
+  const base = adjustForTheme(color || UNCATEGORIZED_COLOR, isDark);
   return (
     <span
       className={`inline-flex items-center justify-center rounded-full shrink-0 ${className || 'w-9 h-9'}`}
