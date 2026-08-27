@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { reportClientError } from '@/lib/errorReporting';
 
 // Each route is a separate lazy-loaded chunk (Recurring-<hash>.js, etc.).
 // A tab left open from before a deploy still has the OLD index.html/main
@@ -21,7 +22,11 @@ export default class ChunkErrorBoundary extends Component {
     return { hasError: true };
   }
 
-  componentDidCatch() {
+  componentDidCatch(error) {
+    // Reported regardless of whether this is the (likely) stale-chunk case
+    // that auto-reloads, or a real, persistent crash — knowing how often
+    // the former happens after a deploy is useful too.
+    reportClientError(error?.message, { stack: error?.stack, kind: 'render' });
     if (!sessionStorage.getItem(RELOAD_FLAG)) {
       sessionStorage.setItem(RELOAD_FLAG, '1');
       window.location.reload();

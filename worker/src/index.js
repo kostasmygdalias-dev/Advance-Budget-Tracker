@@ -233,6 +233,25 @@ async function handleViberWebhook(request, env, cors) {
   return json({ status: 0, status_message: 'ok' }, 200, cors);
 }
 
+// Best-effort sink for src/lib/errorReporting.js — no auth (a crash can
+// happen before/without one), just logs to this Worker's own console so
+// `wrangler tail` / Cloudflare's Logs actually show it, instead of a broken
+// production build only ever being noticed if a user happens to report it.
+async function handleClientError(request, env, cors) {
+  if (await isRateLimited(env, `client-error:${clientIp(request)}`, { limit: 30, windowSeconds: 60 })) {
+    return json({ ok: true }, 200, cors);
+  }
+  const body = await request.json().catch(() => ({}));
+  console.error('Client error report:', {
+    message: typeof body.message === 'string' ? body.message.slice(0, 2000) : '(no message)',
+    url: typeof body.url === 'string' ? body.url.slice(0, 500) : undefined,
+    kind: body.kind,
+    stack: typeof body.stack === 'string' ? body.stack.slice(0, 4000) : undefined,
+    userAgent: typeof body.userAgent === 'string' ? body.userAgent.slice(0, 200) : undefined,
+  });
+  return json({ ok: true }, 200, cors);
+}
+
 async function handleViberStatus(request, env, cors) {
   const user = await verifyGoogleUser(request);
   if (!user) return json({ error: 'Unauthorized' }, 401, cors);
@@ -289,6 +308,9 @@ export default {
       }
       if (url.pathname === '/viber/unlink' && request.method === 'POST') {
         return await handleViberUnlink(request, env, cors);
+      }
+      if (url.pathname === '/client-error' && request.method === 'POST') {
+        return await handleClientError(request, env, cors);
       }
       return json({ error: 'Not found' }, 404, cors);
     } catch (err) {
