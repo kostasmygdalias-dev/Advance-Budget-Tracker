@@ -7,7 +7,10 @@ const round2 = (n) => Math.round(n * 100) / 100;
 // getters (getMonth/getDate) can roll a month-start date back to the previous
 // month for anyone west of UTC. Parse the components directly instead so the
 // date always lands on the calendar day the string names, in local time.
-function parseDateLocal(dateStr) {
+// Was independently reimplemented (byte-for-byte identical) in Budgets.jsx,
+// Dashboard.jsx, Goals.jsx, and Recurring.jsx — exported here so they can
+// share this one instead.
+export function parseDateLocal(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
@@ -134,3 +137,8 @@ export function shortMonth(date, lang = 'en') {
 export function currentMonthStr(ref = new Date()) {
   return toMonthStr(startOfMonth(ref));
 }
+
+// Same one-liner was independently redeclared in every page that shows a
+// money amount (Budgets, Dashboard, Goals, Recurring, Reports,
+// Transactions) — shared here instead.
+export const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;

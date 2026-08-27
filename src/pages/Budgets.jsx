@@ -7,20 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Save } from 'lucide-react';
-import { getMonthlyContribution, currentMonthStr } from '@/lib/finance';
+import { getMonthlyContribution, currentMonthStr, parseDateLocal, fmt } from '@/lib/finance';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { amountIncludingChildren } from '@/lib/categoryTree';
 import { useCategoriesQuery, useSettingsQuery, useInvalidateSettings } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
-
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
-
-function parseLocalDateDash(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
 
 function ProgressBar({ pct }) {
   return (
@@ -171,7 +164,7 @@ export default function Budgets() {
   const totalSpentPeriod = budgetPeriod === 'weekly'
     ? expenses.reduce((s, e) => {
         if ((e.currency || 'EUR') !== currency || e.expense_type === 'amortized' || !e.paid_date) return s;
-        const d = parseLocalDateDash(e.paid_date);
+        const d = parseDateLocal(e.paid_date);
         return d >= periodStart && d <= periodEnd ? s + (e.amount || 0) : s;
       }, 0)
     : expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);

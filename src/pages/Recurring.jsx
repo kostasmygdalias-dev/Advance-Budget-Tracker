@@ -17,7 +17,7 @@ import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
-import { shortMonth } from '@/lib/finance';
+import { shortMonth, parseDateLocal, fmt } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
@@ -38,17 +38,10 @@ const getTypes = (t) => [
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
 
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
-
-function parseLocalDate(dateStr) {
-  const [y, m, day] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, day);
-}
-
 function advanceDate(dateStr, frequency, customDays) {
   // Parse as local calendar components, not `new Date(dateStr)` (UTC midnight),
   // which can roll a month-start date back a day for timezones west of UTC.
-  const d = parseLocalDate(dateStr);
+  const d = parseDateLocal(dateStr);
   if (frequency === 'daily') return addDays(d, 1);
   if (frequency === 'weekly') return addWeeks(d, 1);
   if (frequency === 'monthly') return addMonths(d, 1);
@@ -56,7 +49,7 @@ function advanceDate(dateStr, frequency, customDays) {
 }
 
 function regressDate(dateStr, frequency, customDays) {
-  const d = parseLocalDate(dateStr);
+  const d = parseDateLocal(dateStr);
   if (frequency === 'daily') return subDays(d, 1);
   if (frequency === 'weekly') return subWeeks(d, 1);
   if (frequency === 'monthly') return subMonths(d, 1);
@@ -68,7 +61,7 @@ function regressDate(dateStr, frequency, customDays) {
 // "last generated" field stored, but that's exactly what next_due_date
 // minus one period represents).
 function cycleProgress(t) {
-  const cycleEnd = parseLocalDate(t.next_due_date);
+  const cycleEnd = parseDateLocal(t.next_due_date);
   const cycleStart = regressDate(t.next_due_date, t.frequency, t.custom_interval_days);
   const today = new Date();
   const totalMs = cycleEnd - cycleStart;
@@ -104,7 +97,7 @@ function forecastRecurring(templates, defaultCurrency, lang) {
 
   relevant.forEach((t) => {
     const signed = t.type === 'income' ? t.amount : -t.amount;
-    let d = parseLocalDate(t.next_due_date);
+    let d = parseDateLocal(t.next_due_date);
     let iterations = 0;
     while (d <= in365 && iterations < 400) {
       if (d <= in30) next30 += signed;

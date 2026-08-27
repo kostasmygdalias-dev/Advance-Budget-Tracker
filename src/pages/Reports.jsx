@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Download, Printer } from 'lucide-react';
 import {
-  getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths,
+  getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths, fmt,
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
@@ -24,7 +24,6 @@ import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 // Every report on this page is bucketed by month, matching the granularity
 // finance.js already operates at everywhere else (getMonthlyContribution,

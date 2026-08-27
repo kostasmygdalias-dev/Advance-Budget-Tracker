@@ -15,23 +15,18 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { parseDateLocal, fmt } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'AUD', 'CAD'];
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
-
-function parseLocalDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
 
 export default function Goals() {
   const { toast } = useToast();
@@ -202,7 +197,7 @@ export default function Goals() {
             {goals.map((g) => {
               const pct = g.target_amount > 0 ? Math.min(100, (g.saved_amount / g.target_amount) * 100) : 0;
               const remaining = Math.max(0, g.target_amount - g.saved_amount);
-              const monthsLeft = g.deadline ? Math.max(1, differenceInCalendarMonths(parseLocalDate(g.deadline), new Date())) : null;
+              const monthsLeft = g.deadline ? Math.max(1, differenceInCalendarMonths(parseDateLocal(g.deadline), new Date())) : null;
               const perMonth = monthsLeft ? remaining / monthsLeft : null;
               return (
                 <Card key={g.id} className="p-5 space-y-3">

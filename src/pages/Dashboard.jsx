@@ -18,7 +18,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth,
+  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt,
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
@@ -33,7 +33,6 @@ const DashboardCustomizePanel = lazy(() => import('@/components/DashboardCustomi
 const INCOME_COLOR = '#10b981';
 
 const PALETTE = ['#0f172a', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 const AUTO_BACKUP_CHECK_KEY = 'expensetrack_last_auto_backup_check';
 const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -84,11 +83,6 @@ function OnboardingGuide() {
       </div>
     </Card>
   );
-}
-
-function parseLocalDateDash(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
 }
 
 // Every widget the dashboard can show — "span: full" takes the whole row,
@@ -566,7 +560,7 @@ export default function Dashboard() {
   const budgetPeriodExpenseTotal = budgetPeriod === 'weekly'
     ? expenses.reduce((s, e) => {
         if ((e.currency || 'EUR') !== currency || e.expense_type === 'amortized' || !e.paid_date) return s;
-        const d = parseLocalDateDash(e.paid_date);
+        const d = parseDateLocal(e.paid_date);
         return d >= periodStart && d <= periodEnd ? s + (e.amount || 0) : s;
       }, 0)
     : currentExpenseTotal;

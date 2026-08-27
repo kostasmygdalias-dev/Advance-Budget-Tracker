@@ -23,7 +23,7 @@ import {
   Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
   Download, ListChecks, X, Tags,
 } from 'lucide-react';
-import { monthLabel, currentMonthStr } from '@/lib/finance';
+import { monthLabel, currentMonthStr, fmt } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
@@ -41,8 +41,6 @@ const getPaymentMethods = (t) => [
   { value: 'bank_transfer', label: t('common.paymentMethod.bank_transfer') },
   { value: 'other', label: t('common.paymentMethod.other') },
 ];
-
-const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 // Local date, not UTC — toISOString() would show yesterday's/tomorrow's date
