@@ -741,7 +741,7 @@ export default function Dashboard() {
                     return (
                       <div key={d.id}>
                         <div className="flex items-center gap-2 text-sm px-1.5 py-1">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                          <IconAvatar icon={(props) => <CategoryIcon name={d.icon} {...props} />} color={d.color} className="w-4 h-4" />
                           <span className="flex-1 min-w-0 truncate">{d.name}</span>
                           <div className="shrink-0 text-right leading-tight">
                             <div className="tabular-nums font-medium">{fmt(d.total, currency)}</div>
