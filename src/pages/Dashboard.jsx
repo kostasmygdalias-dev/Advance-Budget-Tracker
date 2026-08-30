@@ -94,6 +94,7 @@ const WIDGET_DEFS = [
   { id: 'recentTransactions', span: 'full' },
   { id: 'budget', span: 'half' },
   { id: 'categoryBudgets', span: 'full' },
+  { id: 'goals', span: 'half' },
   { id: 'avgSpent', span: 'half' },
   { id: 'trend', span: 'full' },
   { id: 'categoryPie', span: 'half' },
@@ -247,6 +248,44 @@ function CategoryBudgets({ rows, currency }) {
   );
 }
 
+// Goals still in progress, closest-to-done first (the encouraging framing —
+// mirrors CategoryBudgets showing only categories that actually have a
+// budget set). Reached goals free up their spot rather than sitting there
+// with nothing left to do; if every goal is reached, the empty state says
+// so instead of the generic "no goals yet."
+function GoalsWidget({ rows, hasAnyGoals }) {
+  const { t } = useLanguage();
+  return (
+    <Link to="/goals" className="block group h-full">
+      <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium">{t('dashboard.widgets.goals')}</p>
+          <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {hasAnyGoals ? t('dashboard.allGoalsReached') : t('dashboard.noGoalsYet')}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((g) => (
+              <div key={g.id}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-sm font-medium truncate">{g.name}</p>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">{fmt(g.saved_amount, g.currency)} / {fmt(g.target_amount, g.currency)}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${g.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </Link>
+  );
+}
+
 // Below this many uncategorized expenses in the current month, the banner
 // stays hidden — a stray one or two isn't worth nagging about.
 const UNCATEGORIZED_ALERT_THRESHOLD = 3;
@@ -286,6 +325,7 @@ export default function Dashboard() {
   const incomeSources = getIncomeSources(t);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
+  const [goals, setGoals] = useState([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(null);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
@@ -318,12 +358,14 @@ export default function Dashboard() {
     setTxError(null);
     (async () => {
       try {
-        const [exp, inc] = await Promise.all([
+        const [exp, inc, gls] = await Promise.all([
           entities.Expense.list('-paid_date', 500),
           entities.Income.list('-received_date', 500),
+          entities.Goal.list('-created_date'),
         ]);
         setExpenses(exp);
         setIncomes(inc);
+        setGoals(gls);
       } catch (err) {
         setTxError(err);
       } finally {
@@ -529,6 +571,12 @@ export default function Dashboard() {
     })
     .sort((a, b) => b.pct - a.pct);
 
+  const goalRows = goals
+    .map((g) => ({ ...g, pct: g.target_amount > 0 ? Math.min(100, (g.saved_amount / g.target_amount) * 100) : 0 }))
+    .filter((g) => g.pct < 100)
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 4);
+
   const bySource = {};
   incomes.forEach((i) => {
     if ((i.currency || 'EUR') !== currency) return;
@@ -641,6 +689,8 @@ export default function Dashboard() {
         );
       case 'categoryBudgets':
         return <CategoryBudgets rows={categoryBudgetRows} currency={currency} />;
+      case 'goals':
+        return <GoalsWidget rows={goalRows} hasAnyGoals={goals.length > 0} />;
       case 'avgSpent':
         return (
           <Card className="p-5 h-full">
