@@ -451,6 +451,10 @@ export default function Dashboard() {
   }));
   const currentExpenseTotal = expenses.reduce((s, e) => s + ((e.currency || 'EUR') === currency ? getMonthlyContribution(e, thisMonth) : 0), 0);
   const currentIncomeTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
+  // Denominator for the category widget's percentages below — salary only,
+  // not every income source, so e.g. "35%" reads as "over a third of your
+  // salary" rather than being diluted by one-off gifts/refunds/investments.
+  const currentSalaryTotal = incomes.reduce((s, i) => s + ((i.currency || 'EUR') === currency && i.source === 'salary' && isInMonth(i.received_date, thisMonth) ? i.amount || 0 : 0), 0);
 
   const uncategorizedCount = expenses.filter((e) =>
     !e.category_id && (e.currency || 'EUR') === currency && getMonthlyContribution(e, thisMonth) > 0
@@ -517,7 +521,6 @@ export default function Dashboard() {
   }
   categoryReport.sort((a, b) => b.total - a.total);
   categoryReport.forEach((g) => g.children.sort((a, b) => b.total - a.total));
-  const categoryReportTotal = categoryReport.reduce((s, g) => s + g.total, 0);
   const categoryFocusEntries = categoryReport.flatMap((g) => [
     { id: g.id, name: g.name, depth: 0 },
     ...g.children.map((c) => ({ id: c.id, name: c.name, depth: 1 })),
@@ -787,7 +790,11 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
                   {categoryReport.map((d) => {
-                    const pct = categoryReportTotal > 0 ? (d.total / categoryReportTotal) * 100 : 0;
+                    // % of this month's salary income specifically — not a share of total
+                    // spending, and not diluted by one-off gifts/refunds/investment income.
+                    // Hidden rather than shown as "0%" when no salary is logged yet — that
+                    // would misleadingly read as "this costs nothing".
+                    const pct = currentSalaryTotal > 0 ? (d.total / currentSalaryTotal) * 100 : null;
                     return (
                       <div key={d.id}>
                         <div className="flex items-center gap-2 text-sm px-1.5 py-1">
@@ -795,7 +802,7 @@ export default function Dashboard() {
                           <span className="flex-1 min-w-0 truncate">{d.name}</span>
                           <div className="shrink-0 text-right leading-tight">
                             <div className="tabular-nums font-medium">{fmt(d.total, currency)}</div>
-                            <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}%</div>
+                            {pct !== null && <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}% {t('dashboard.ofSalary')}</div>}
                           </div>
                         </div>
                         {d.children.map((c) => (

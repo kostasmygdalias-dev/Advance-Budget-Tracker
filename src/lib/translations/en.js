@@ -142,6 +142,7 @@ export const en = {
     noSpendingThisMonth: 'No spending recorded this month yet.',
     incomeBySourceFor: 'Income by source — {{month}}',
     noIncomeThisMonth: 'No income recorded this month yet.',
+    ofSalary: 'of salary',
     onboarding: {
       title: 'Welcome to ExpenseTrack',
       subtitle: "Let's get your finances set up. A few quick steps:",

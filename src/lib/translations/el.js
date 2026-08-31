@@ -142,6 +142,7 @@ export const el = {
     noSpendingThisMonth: 'Δεν έχουν καταγραφεί δαπάνες αυτόν τον μήνα ακόμα.',
     incomeBySourceFor: 'Έσοδα ανά πηγή — {{month}}',
     noIncomeThisMonth: 'Δεν έχουν καταγραφεί έσοδα αυτόν τον μήνα ακόμα.',
+    ofSalary: 'του μισθού',
     onboarding: {
       title: 'Καλώς ήρθατε στο ExpenseTrack',
       subtitle: 'Ας ρυθμίσουμε τα οικονομικά σας. Μερικά γρήγορα βήματα:',
