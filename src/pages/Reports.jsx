@@ -16,7 +16,7 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
-import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
+import { amountIncludingChildren, buildCategoryReport } from '@/lib/categoryTree';
 import { downloadCsv } from '@/lib/exportFile';
 import { useCategoriesQuery, useSettingsQuery } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
@@ -169,37 +169,15 @@ export default function Reports() {
   // totals (same rollup already used for budget vs. actual below) — so
   // "how much did I spend on Transport" reads as one number even when every
   // transaction is actually tagged to Fuel/Parking/etc underneath it.
-  const categoryReport = [];
-  let currentGroup = null;
-  flattenCategoryTree(categories).forEach((c) => {
-    if (c.depth === 0) {
-      const total = amountIncludingChildren(c.id, categoryTotals, categories);
-      currentGroup = total > 0 ? {
-        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
-        total, count: categoryCounts[c.id] || 0, children: [],
-      } : null;
-      if (currentGroup) categoryReport.push(currentGroup);
-    } else if (currentGroup && categoryTotals[c.id] > 0) {
-      currentGroup.count += categoryCounts[c.id] || 0;
-      currentGroup.children.push({
-        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
-        total: categoryTotals[c.id], count: categoryCounts[c.id] || 0,
-      });
-    }
-  });
-  if (categoryTotals.uncategorized > 0) {
-    categoryReport.push({
-      id: 'uncategorized', name: t('transactions.uncategorized'), color: UNCATEGORIZED_COLOR, icon: null,
-      total: categoryTotals.uncategorized, count: categoryCounts.uncategorized || 0, children: [],
-    });
-  }
+  // Sorted by total, descending, both levels — buildCategoryReport() handles
+  // that; pct here is this page's own (share of the whole date range).
+  const categoryReport = buildCategoryReport(categoryTotals, categoryCounts, categories, t('transactions.uncategorized'));
   categoryReport.forEach((g) => {
     g.pct = totalExpense > 0 ? (g.total / totalExpense) * 100 : 0;
-    g.children.sort((a, b) => b.total - a.total).forEach((c) => {
+    g.children.forEach((c) => {
       c.pct = totalExpense > 0 ? (c.total / totalExpense) * 100 : 0;
     });
   });
-  categoryReport.sort((a, b) => b.total - a.total);
   const focusFlatEntries = categoryReport.flatMap((g) => [
     { id: g.id, name: g.name, depth: 0 },
     ...g.children.map((c) => ({ id: c.id, name: c.name, depth: 1 })),

@@ -22,7 +22,7 @@ import {
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
-import { amountIncludingChildren, flattenCategoryTree } from '@/lib/categoryTree';
+import { amountIncludingChildren, buildCategoryReport } from '@/lib/categoryTree';
 import CategoryMultiSelect from '@/components/CategoryMultiSelect';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -495,32 +495,7 @@ export default function Dashboard() {
   // Same parent-rollup + multi-select drill-down as Reports' "Spending by
   // category" card (see CategoryMultiSelect there) — this month only,
   // instead of a date range, since that's this widget's whole point.
-  const categoryReport = [];
-  let currentCategoryGroup = null;
-  flattenCategoryTree(categories).forEach((c) => {
-    if (c.depth === 0) {
-      const total = amountIncludingChildren(c.id, byCategory, categories);
-      currentCategoryGroup = total > 0 ? {
-        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
-        total, count: byCategoryCounts[c.id] || 0, children: [],
-      } : null;
-      if (currentCategoryGroup) categoryReport.push(currentCategoryGroup);
-    } else if (currentCategoryGroup && byCategory[c.id] > 0) {
-      currentCategoryGroup.count += byCategoryCounts[c.id] || 0;
-      currentCategoryGroup.children.push({
-        id: c.id, name: c.name, color: c.color || PALETTE[0], icon: c.icon,
-        total: byCategory[c.id], count: byCategoryCounts[c.id] || 0,
-      });
-    }
-  });
-  if (byCategory.uncategorized > 0) {
-    categoryReport.push({
-      id: 'uncategorized', name: t('transactions.uncategorized'), color: UNCATEGORIZED_COLOR, icon: null,
-      total: byCategory.uncategorized, count: byCategoryCounts.uncategorized || 0, children: [],
-    });
-  }
-  categoryReport.sort((a, b) => b.total - a.total);
-  categoryReport.forEach((g) => g.children.sort((a, b) => b.total - a.total));
+  const categoryReport = buildCategoryReport(byCategory, byCategoryCounts, categories, t('transactions.uncategorized'));
   const categoryFocusEntries = categoryReport.flatMap((g) => [
     { id: g.id, name: g.name, depth: 0 },
     ...g.children.map((c) => ({ id: c.id, name: c.name, depth: 1 })),
