@@ -181,6 +181,49 @@ export default function Recurring() {
     return generated;
   };
 
+  // One-time self-heal for templates created before RecurringTemplate had a
+  // category_id column, run once per device (flag below) rather than on
+  // every visit — by design there's nothing left to fix after the first
+  // successful run, since generateOne() has carried a template's category
+  // onto every new occurrence since the column was added.
+  //
+  // Two passes: (1) a template still missing a category adopts the most
+  // recent category the user set by hand on one of the expenses it already
+  // generated, so existing bills don't need to be re-set in the Edit dialog
+  // just because the field didn't exist yet when they were created; (2)
+  // *any* categorized template — from step 1, or already set — gets that
+  // category applied back onto its own past occurrences that are still
+  // uncategorized, since those were generated before this fix existed and
+  // wouldn't otherwise ever pick it up.
+  const BACKFILL_DONE_KEY = 'expensetrack_recurring_category_backfill_done';
+  const backfillTemplateCategories = async (list) => {
+    if (localStorage.getItem(BACKFILL_DONE_KEY)) return { templates: 0, expenses: 0 };
+    const expenseTemplates = list.filter((t) => t.type !== 'income');
+    if (!expenseTemplates.length) return { templates: 0, expenses: 0 };
+
+    const expenses = await entities.Expense.list('-paid_date', 500);
+    let templatesFixed = 0;
+    const expenseFixes = [];
+    for (const t of expenseTemplates) {
+      const linked = expenses.filter((e) => e.recurring_template_id === t.id);
+      let categoryId = t.category_id || null;
+      if (!categoryId) {
+        const categorized = linked.find((e) => e.category_id);
+        if (categorized) {
+          categoryId = categorized.category_id;
+          await entities.RecurringTemplate.update(t.id, { category_id: categoryId });
+          templatesFixed++;
+        }
+      }
+      if (categoryId) {
+        linked.filter((e) => !e.category_id).forEach((e) => expenseFixes.push(entities.Expense.update(e.id, { category_id: categoryId })));
+      }
+    }
+    await Promise.all(expenseFixes);
+    localStorage.setItem(BACKFILL_DONE_KEY, '1');
+    return { templates: templatesFixed, expenses: expenseFixes.length };
+  };
+
   const load = () => {
     setLoading(true);
     setLoadError(null);
@@ -188,11 +231,21 @@ export default function Recurring() {
       try {
         const list = await entities.RecurringTemplate.list();
         const generated = await catchUp(list);
-        setTemplates(generated > 0 ? await entities.RecurringTemplate.list() : list);
+        const { templates: templatesFixed, expenses: expensesFixed } = await backfillTemplateCategories(list);
+        setTemplates(generated > 0 || templatesFixed > 0 ? await entities.RecurringTemplate.list() : list);
         if (generated > 0) {
           toast({
             title: generated === 1 ? tr('recurring.entriesAddedOne', { count: generated }) : tr('recurring.entriesAddedOther', { count: generated }),
             description: tr('recurring.generatedAutomatically'),
+          });
+        }
+        // Toast on expensesFixed, not templatesFixed — a template that
+        // already had a category (nothing to fix on the template itself)
+        // can still have past occurrences that needed re-categorizing, and
+        // that's the part actually visible to the user in Transactions.
+        if (expensesFixed > 0) {
+          toast({
+            title: expensesFixed === 1 ? tr('recurring.categoriesBackfilledOne', { count: expensesFixed }) : tr('recurring.categoriesBackfilledOther', { count: expensesFixed }),
           });
         }
       } catch (err) {

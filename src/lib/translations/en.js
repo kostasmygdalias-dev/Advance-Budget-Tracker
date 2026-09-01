@@ -266,6 +266,8 @@ export const en = {
     entriesAddedOther: '{{count}} recurring entries added',
     generatedAutomatically: 'Generated automatically for templates that came due.',
     addedRightAway: "Since the due date is today or already passed, it was added right away — you don't need to do anything else.",
+    categoriesBackfilledOne: '{{count}} past recurring expense re-categorized to match its template',
+    categoriesBackfilledOther: '{{count}} past recurring expenses re-categorized to match their templates',
   },
 
   goals: {

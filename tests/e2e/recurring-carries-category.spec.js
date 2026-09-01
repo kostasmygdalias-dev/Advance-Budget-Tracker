@@ -41,3 +41,45 @@ test("a recurring template's category carries onto the expense it auto-generates
   await expect(row.getByText('Groceries', { exact: false })).toBeVisible();
   await expect(row.getByText('Uncategorized', { exact: false })).toHaveCount(0);
 });
+
+// The other direction: a template that already has a category (whether set
+// directly or backfilled) also retroactively fixes its own past
+// occurrences still sitting uncategorized — those were generated before
+// this feature existed, so generateOne() never had a chance to categorize
+// them. See the second pass in backfillTemplateCategories().
+const ENTERTAINMENT_ID = 'cat-entertainment';
+const NETFLIX_TEMPLATE_ID = 'tpl-netflix';
+const pastExpenseSeed = {
+  Categories: [
+    SHEET_HEADERS.Categories,
+    [ENTERTAINMENT_ID, 'Entertainment', 'Clapperboard', '#f97316', '', 0, CREATED],
+  ],
+  RecurringTemplate: [
+    SHEET_HEADERS.RecurringTemplate,
+    // Far-future next_due_date — catchUp() generates nothing this run, so
+    // the only thing under test is the retroactive fix on the old row below.
+    [NETFLIX_TEMPLATE_ID, 'Netflix', 15.99, 'EUR', 'monthly', '', '2027-01-01', true, CREATED, 'expense', '', ENTERTAINMENT_ID],
+  ],
+  Expenses: [
+    [...SHEET_HEADERS.Expenses, 'recurring_template_id'],
+    // Pre-dates category_id existing on RecurringTemplate — generated with none.
+    ['exp-old-netflix', 'Netflix', 15.99, 'EUR', '2026-06-01', '', 'card', '', '', '', 'single', '', '', '', CREATED, false, NETFLIX_TEMPLATE_ID],
+  ],
+  Settings: [
+    SHEET_HEADERS.Settings,
+    ['settings-1', 'EUR', '', '{}', CREATED, 'monthly', ''],
+  ],
+};
+
+test("a template's category retroactively fixes its own past uncategorized occurrences", async ({ page }) => {
+  await signIn(page, { seed: pastExpenseSeed });
+
+  await page.getByRole('link', { name: 'Recurring', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Recurring' })).toBeVisible();
+  await expect(page.locator('[role="status"]', { hasText: 'categorized' }).first()).toBeVisible();
+
+  await page.goto('/#/transactions?month=all');
+  const row = page.locator('div.rounded-xl', { has: page.locator('p.font-medium.truncate', { hasText: 'Netflix' }) });
+  await expect(row.getByText('Entertainment', { exact: false })).toBeVisible();
+  await expect(row.getByText('Uncategorized', { exact: false })).toHaveCount(0);
+});
