@@ -18,6 +18,8 @@ import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceI
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { shortMonth, parseDateLocal, fmt, CURRENCIES } from '@/lib/finance';
+import { flattenCategoryTree } from '@/lib/categoryTree';
+import { useCategoriesQuery } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
@@ -119,6 +121,8 @@ export default function Recurring() {
   const TYPES = getTypes(tr);
   const incomeSources = getIncomeSources(tr);
   const { active: subActive, loading: subLoading, configured: billingConfigured, upgradeUrl } = useSubscription();
+  const catQuery = useCategoriesQuery();
+  const categories = catQuery.data || [];
   const [templates, setTemplates] = useState([]);
   const [defaultCurrency, setDefaultCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
@@ -147,6 +151,7 @@ export default function Recurring() {
         amount: t.amount,
         currency: t.currency || defaultCurrency,
         paid_date: t.next_due_date,
+        category_id: t.category_id || null,
         payment_method: 'card',
         expense_type: 'single',
         amortization_schedule: [],
@@ -207,7 +212,7 @@ export default function Recurring() {
 
   const openNew = (type = 'expense') => setEditing({
     type, description: '', amount: '', currency: defaultCurrency, frequency: 'monthly', custom_interval_days: '',
-    next_due_date: format(new Date(), 'yyyy-MM-dd'), active: true, source: 'salary',
+    next_due_date: format(new Date(), 'yyyy-MM-dd'), active: true, source: 'salary', category_id: '',
   });
   const openEdit = (t) => setEditing({
     ...t,
@@ -216,6 +221,7 @@ export default function Recurring() {
     amount: String(t.amount ?? ''),
     custom_interval_days: String(t.custom_interval_days ?? ''),
     source: t.source || 'salary',
+    category_id: t.category_id || '',
   });
 
   const save = async (e) => {
@@ -232,6 +238,7 @@ export default function Recurring() {
       next_due_date: editing.next_due_date,
       active: editing.active,
       source: isIncome ? (editing.source || 'other') : null,
+      category_id: isIncome ? null : (editing.category_id || null),
     };
     try {
       const saved = editing.id
@@ -282,8 +289,8 @@ export default function Recurring() {
     }
   };
 
-  if (loading || subLoading) return <PageSkeleton />;
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  if (loading || subLoading || catQuery.isLoading) return <PageSkeleton />;
+  if (loadError || catQuery.error) return <LoadError error={loadError || catQuery.error} onRetry={() => { load(); catQuery.refetch(); }} />;
   if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
 
   const forecast = forecastRecurring(templates, defaultCurrency, lang);
@@ -466,7 +473,7 @@ export default function Recurring() {
                   </Select>
                 </div>
               </div>
-              {editing.type === 'income' && (
+              {editing.type === 'income' ? (
                 <div className="space-y-2">
                   <Label>{tr('incomeForm.source')}</Label>
                   <Select value={editing.source} onValueChange={(v) => setEditing({ ...editing, source: v })}>
@@ -474,6 +481,23 @@ export default function Recurring() {
                     <SelectContent>
                       {incomeSources.map((s) => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>{tr('common.category')}</Label>
+                  {/* Every occurrence this template generates carries this
+                      category — set once here instead of having to
+                      re-categorize each month's auto-added expense by hand. */}
+                  <Select value={editing.category_id} onValueChange={(v) => setEditing({ ...editing, category_id: v })}>
+                    <SelectTrigger><SelectValue placeholder={tr('expenseForm.categoryPlaceholder')} /></SelectTrigger>
+                    <SelectContent>
+                      {flattenCategoryTree(categories).map((c) => (
+                        <SelectItem key={c.id} value={c.id} className={c.depth > 0 ? 'pl-6 text-muted-foreground' : ''}>
+                          {c.depth > 0 ? '↳ ' : ''}{c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -49,7 +49,7 @@ const SCHEMAS = {
   Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date', 'reconciled', 'recurring_template_id'],
   Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled', 'recurring_template_id'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
-  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source'],
+  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source', 'category_id'],
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period', 'dashboard_layout'],
   Debts: ['id', 'person', 'direction', 'total_amount', 'paid_amount', 'currency', 'start_date', 'due_date', 'notes', 'created_date'],
   Goals: ['id', 'name', 'icon', 'target_amount', 'saved_amount', 'currency', 'deadline', 'created_date'],
@@ -441,7 +441,8 @@ const CategorySchema = z.object({
 const RecurringTemplateSchema = z.object({
   id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
   frequency: z.string(), custom_interval_days: z.number().nullable(), next_due_date: z.string(),
-  active: z.boolean(), created_date: z.string(), type: z.string(), source: z.string().nullable(), ...RowMeta,
+  active: z.boolean(), created_date: z.string(), type: z.string(), source: z.string().nullable(),
+  category_id: z.string().nullable(), ...RowMeta,
 });
 const SettingsSchema = z.object({
   id: z.string().min(1), default_currency: z.string(), monthly_budget_total: z.number().nullable(),
@@ -497,13 +498,15 @@ const RecurringTemplate = makeStore(
   (t) => [
     t.id, t.description || '', t.amount ?? 0, t.currency || 'EUR', t.frequency || 'monthly', t.custom_interval_days ?? '',
     t.next_due_date || '', t.active !== false, t.created_date || new Date().toISOString(), t.type || 'expense', t.source || '',
+    t.category_id || '',
   ],
-  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date, type, source]) => ({
+  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date, type, source, category_id]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', frequency: frequency || 'monthly',
     custom_interval_days: custom_interval_days !== '' && custom_interval_days != null ? Number(custom_interval_days) : null,
     next_due_date: next_due_date || '', active: active === true || active === 'TRUE', created_date: created_date || '',
-    // `type` is missing (empty string) on rows written before recurring income existed — those were all expense templates.
-    type: type || 'expense', source: source || null,
+    // `type`/`category_id` are missing (empty string/undefined) on rows written
+    // before those columns existed — old expense templates default to no category.
+    type: type || 'expense', source: source || null, category_id: category_id || null,
   }),
   RecurringTemplateSchema,
 );
