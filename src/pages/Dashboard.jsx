@@ -18,7 +18,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt,
+  getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt, formatDateDMY,
 } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
@@ -191,7 +191,7 @@ function RecentTransactions({ rows, catMap }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{row.description}</p>
-                    <p className="text-xs text-muted-foreground">{row._date}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateDMY(row._date)}</p>
                   </div>
                   <span className={`text-sm font-semibold tabular-nums ${isIncome ? 'text-emerald-600' : ''}`}>
                     {isIncome ? '+' : ''}{fmt(row.amount, row.currency)}

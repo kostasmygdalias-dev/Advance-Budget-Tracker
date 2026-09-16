@@ -24,7 +24,7 @@ import {
   Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
   Download, ListChecks, X, Tags,
 } from 'lucide-react';
-import { monthLabel, currentMonthStr, fmt, todayStr } from '@/lib/finance';
+import { monthLabel, currentMonthStr, fmt, todayStr, formatDateDMY } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { getPaymentMethods } from '@/components/ExpenseForm';
 import { CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
@@ -119,7 +119,7 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {cat ? `${cat.name} · ` : ''}{e.paid_date} · {PAYMENT_METHODS.find((m) => m.value === e.payment_method)?.label || e.payment_method}
+            {cat ? `${cat.name} · ` : ''}{formatDateDMY(e.paid_date)} · {PAYMENT_METHODS.find((m) => m.value === e.payment_method)?.label || e.payment_method}
             {(e.tags || []).length > 0 && ` · ${e.tags.join(', ')}`}
           </p>
         </div>
@@ -167,7 +167,7 @@ function IncomeRow({ i, onCopy, onDelete, onToggleReconciled, selectMode, select
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {incomeSources.find((s) => s.value === i.source)?.label || i.source} · {i.received_date}
+            {incomeSources.find((s) => s.value === i.source)?.label || i.source} · {formatDateDMY(i.received_date)}
             {(i.tags || []).length > 0 && ` · ${i.tags.join(', ')}`}
           </p>
         </div>

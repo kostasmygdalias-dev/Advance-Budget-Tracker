@@ -154,3 +154,15 @@ export function todayStr() {
 // money amount (Budgets, Dashboard, Goals, Recurring, Reports,
 // Transactions) — shared here instead.
 export const fmt = (n, c = 'EUR') => `${(n || 0).toFixed(2)} ${c}`;
+
+// "YYYY-MM-DD" -> "DD-MM-YYYY" for read-only display (transaction rows,
+// goal/debt due dates, recurring's next-due line, ...) — plain string
+// rearrangement, not Date parsing, so it can't drift a day across
+// timezones the way `new Date(dateStr)` can. Storage, comparisons, and the
+// DateInput component's own value format all stay the ISO string —
+// display-only.
+export const formatDateDMY = (dateStr) => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}-${m}-${y}`;
+};

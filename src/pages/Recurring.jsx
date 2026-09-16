@@ -18,7 +18,7 @@ import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
-import { shortMonth, parseDateLocal, fmt, CURRENCIES } from '@/lib/finance';
+import { shortMonth, parseDateLocal, fmt, CURRENCIES, formatDateDMY } from '@/lib/finance';
 import { flattenCategoryTree } from '@/lib/categoryTree';
 import { useCategoriesQuery } from '@/hooks/useEntities';
 import LoadError from '@/components/LoadError';
@@ -441,7 +441,7 @@ export default function Recurring() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
                     {t.frequency === 'custom_days' && ` · ${tr('recurring.everyNDays', { n: t.custom_interval_days })}`}
-                    {` · ${tr('recurring.next', { date: t.next_due_date })}`}
+                    {` · ${tr('recurring.next', { date: formatDateDMY(t.next_due_date) })}`}
                   </p>
                 </div>
                 <div className="text-right">

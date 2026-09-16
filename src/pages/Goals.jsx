@@ -16,7 +16,7 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
-import { parseDateLocal, fmt, CURRENCIES, todayStr } from '@/lib/finance';
+import { parseDateLocal, fmt, CURRENCIES, todayStr, formatDateDMY } from '@/lib/finance';
 import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
@@ -197,7 +197,7 @@ export default function Goals() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{g.name}</p>
-                      {g.deadline && <p className="text-xs text-muted-foreground">{t('goals.by', { date: g.deadline })}</p>}
+                      {g.deadline && <p className="text-xs text-muted-foreground">{t('goals.by', { date: formatDateDMY(g.deadline) })}</p>}
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => openEditGoal(g)} aria-label={t('goals.editGoalButton', { name: g.name })}><Pencil className="w-4 h-4" /></Button>
@@ -215,7 +215,7 @@ export default function Goals() {
                     </div>
                   </div>
                   {perMonth != null && remaining > 0 && (
-                    <p className="text-xs text-muted-foreground">{t('goals.savePerMonth', { amount: fmt(perMonth, g.currency), date: g.deadline })}</p>
+                    <p className="text-xs text-muted-foreground">{t('goals.savePerMonth', { amount: fmt(perMonth, g.currency), date: formatDateDMY(g.deadline) })}</p>
                   )}
                   {remaining > 0 ? (
                     <Button variant="outline" size="sm" onClick={() => { setPaymentTarget({ kind: 'goal', item: g }); setPaymentAmount(''); }}>
@@ -248,7 +248,7 @@ export default function Goals() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{theyOwe ? t('goals.theyOweYou', { person: d.person }) : t('goals.youOwe', { person: d.person })}</p>
-                      {d.due_date && <p className="text-xs text-muted-foreground">{t('goals.due', { date: d.due_date })}</p>}
+                      {d.due_date && <p className="text-xs text-muted-foreground">{t('goals.due', { date: formatDateDMY(d.due_date) })}</p>}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className={`font-semibold tabular-nums mr-1 ${theyOwe ? 'text-emerald-600' : 'text-destructive'}`}>

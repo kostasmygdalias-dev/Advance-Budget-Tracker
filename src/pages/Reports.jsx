@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Download, Printer } from 'lucide-react';
 import {
-  getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths, fmt,
+  getMonthlyContribution, currentMonthStr, monthLabel, isInMonth, getRecentMonths, fmt, formatDateDMY,
 } from '@/lib/finance';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
@@ -564,7 +564,7 @@ export default function Reports() {
                   <IconAvatar icon={(props) => <CategoryIcon name={cat?.icon} {...props} />} color={color} className="w-8 h-8" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{e.description}</p>
-                    <p className="text-xs text-muted-foreground">{cat ? `${cat.name} · ` : ''}{e.paid_date}</p>
+                    <p className="text-xs text-muted-foreground">{cat ? `${cat.name} · ` : ''}{formatDateDMY(e.paid_date)}</p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums">{fmt(e._contrib, e.currency)}</span>
                 </div>
