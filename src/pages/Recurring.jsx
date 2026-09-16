@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { entities, deleteRecurringTemplateWithHistory } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -559,7 +560,7 @@ export default function Recurring() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="r-due">{tr('recurring.nextDue')}</Label>
-                  <Input id="r-due" type="date" value={editing.next_due_date} onChange={(e) => setEditing({ ...editing, next_due_date: e.target.value })} />
+                  <DateInput id="r-due" value={editing.next_due_date} onChange={(v) => setEditing({ ...editing, next_due_date: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{tr('recurring.frequencyLabel')}</Label>

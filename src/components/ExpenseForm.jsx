@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { calculateAmortizationSchedule, CURRENCIES, todayStr } from '@/lib/finance';
 import { entities, uploadReceipt } from '@/lib/sheetsStore';
-import { useInvalidateCategories } from '@/hooks/useEntities';
+import { useCategoriesQuery, useInvalidateCategories } from '@/hooks/useEntities';
 import { useLanguage } from '@/lib/i18n';
 import { CATEGORY_ICON_NAMES, CATEGORY_COLORS } from '@/lib/categoryIcons';
 import { flattenCategoryTree } from '@/lib/categoryTree';
@@ -39,7 +41,14 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
   const PAYMENT_METHODS = getPaymentMethods(t);
   const UNITS = getUnits(t);
   const invalidateCategories = useInvalidateCategories();
-  const [categories, setCategories] = useState([]);
+  const catQuery = useCategoriesQuery();
+  // Holds a just-created category (see createCategory below) until
+  // invalidateCategories()'s refetch lands it in catQuery.data for real —
+  // merged into `categories` so it's selectable immediately either way.
+  const [optimisticCategory, setOptimisticCategory] = useState(null);
+  const categories = optimisticCategory && !(catQuery.data || []).some((c) => c.id === optimisticCategory.id)
+    ? [...(catQuery.data || []), optimisticCategory]
+    : (catQuery.data || []);
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -58,10 +67,6 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
     period_value: '',
     period_unit: 'month',
   });
-
-  useEffect(() => {
-    entities.Category.list().then(setCategories).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (initialExpense) {
@@ -98,7 +103,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
         parent_id: null,
         sort_order: categories.length,
       });
-      setCategories((prev) => [...prev, created]);
+      setOptimisticCategory(created);
       set('category_id', created.id);
       setNewCategoryName('');
       setCreatingCategory(false);
@@ -199,18 +204,16 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="paid_date">{t('expenseForm.paidDate')}</Label>
-          <Input
-            id="paid_date"
-            type="date"
-            value={form.paid_date}
-            onChange={(e) => set('paid_date', e.target.value)}
-          />
+          <DateInput id="paid_date" value={form.paid_date} onChange={(v) => set('paid_date', v)} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>{t('common.category')}</Label>
+          {catQuery.isLoading ? (
+            <Skeleton className="h-9 w-full" />
+          ) : (
           <Select
             value={form.category_id}
             onValueChange={(v) => (v === NEW_CATEGORY_VALUE ? setCreatingCategory(true) : set('category_id', v))}
@@ -227,6 +230,7 @@ export default function ExpenseForm({ initialExpense, onSaved, onCancel }) {
               </SelectItem>
             </SelectContent>
           </Select>
+          )}
         </div>
         <div className="space-y-2">
           <Label>{t('expenseForm.paymentMethod')}</Label>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wallet, Laptop, Briefcase, TrendingUp, Gift, RotateCcw, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -134,12 +135,7 @@ export default function IncomeForm({ initialIncome, onSaved, onCancel }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="received_date">{t('incomeForm.receivedDate')}</Label>
-          <Input
-            id="received_date"
-            type="date"
-            value={form.received_date}
-            onChange={(e) => set('received_date', e.target.value)}
-          />
+          <DateInput id="received_date" value={form.received_date} onChange={(v) => set('received_date', v)} />
         </div>
       </div>
 

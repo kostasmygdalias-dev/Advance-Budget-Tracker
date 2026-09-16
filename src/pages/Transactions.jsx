@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -600,18 +601,18 @@ export default function Transactions() {
           <div className="flex items-end gap-3 flex-wrap">
             <div className="space-y-1.5">
               <Label htmlFor="txn-from" className="text-xs">{t('reports.from')}</Label>
-              <Input
-                id="txn-from" type="date" value={dateRange.from}
-                onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
-                className="w-40"
+              <DateInput
+                id="txn-from" value={dateRange.from}
+                onChange={(v) => setDateRange((r) => ({ ...r, from: v }))}
+                className="w-32"
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="txn-to" className="text-xs">{t('reports.to')}</Label>
-              <Input
-                id="txn-to" type="date" value={dateRange.to}
-                onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
-                className="w-40"
+              <DateInput
+                id="txn-to" value={dateRange.to}
+                onChange={(v) => setDateRange((r) => ({ ...r, to: v }))}
+                className="w-32"
               />
             </div>
             <Button variant="ghost" size="sm" onClick={clearCustomRange}>{t('transactions.useMonthView')}</Button>

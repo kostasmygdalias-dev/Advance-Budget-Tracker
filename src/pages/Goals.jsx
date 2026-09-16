@@ -4,6 +4,7 @@ import { differenceInCalendarMonths } from 'date-fns';
 import { entities } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -324,7 +325,7 @@ export default function Goals() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="g-deadline">{t('goals.deadlineOptional')}</Label>
-                  <Input id="g-deadline" type="date" value={editingGoal.deadline} onChange={(e) => setEditingGoal({ ...editingGoal, deadline: e.target.value })} />
+                  <DateInput id="g-deadline" value={editingGoal.deadline} onChange={(v) => setEditingGoal({ ...editingGoal, deadline: v })} />
                 </div>
               </div>
               <Button type="submit" className="w-full">{t('common.save')}</Button>
@@ -377,7 +378,7 @@ export default function Goals() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="d-due">{t('goals.dueDateOptional')}</Label>
-                  <Input id="d-due" type="date" value={editingDebt.due_date} onChange={(e) => setEditingDebt({ ...editingDebt, due_date: e.target.value })} />
+                  <DateInput id="d-due" value={editingDebt.due_date} onChange={(v) => setEditingDebt({ ...editingDebt, due_date: v })} />
                 </div>
               </div>
               <div className="space-y-2">
