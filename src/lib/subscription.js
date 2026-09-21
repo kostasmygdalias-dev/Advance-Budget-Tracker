@@ -48,6 +48,22 @@ export async function fetchSubscriptionStatus() {
   }
 }
 
+// Stripe redirects the browser back the instant payment succeeds, but flips
+// the subscription to active via a separate webhook to the Worker — a race
+// the user would otherwise lose about half the time, landing back in the app
+// still looking like a Free account. Polls until the webhook has landed (or
+// the window runs out). `shouldStop` lets the caller cancel on unmount.
+export async function waitForActiveSubscription({ timeoutMs = 30000, intervalMs = 2000, shouldStop = () => false } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (shouldStop()) return false;
+    const status = await fetchSubscriptionStatus();
+    if (status.active) return true;
+    if (Date.now() + intervalMs >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 export function getUpgradeUrl(user) {
   if (!PAYMENT_LINK || !user?.sub) return null;
   const url = new URL(PAYMENT_LINK);

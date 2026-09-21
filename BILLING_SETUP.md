@@ -62,6 +62,16 @@ details): **Cloudflare** (free tier is enough) and **Stripe**.
 4. **Payment links → New**: pick that product/price → Create link. Copy the
    URL (`https://buy.stripe.com/...`). **Save this** — it's
    `VITE_STRIPE_PAYMENT_LINK` in Part C.
+   **Then set where the customer lands after paying** — otherwise Stripe
+   leaves them on its own confirmation page with no way back into the app:
+   Payment links → open the link → **Edit** (pencil) → **After payment** tab →
+   **Don't show confirmation page** → **Redirect customers to your
+   website** → set the URL to `https://<your-app-domain>/?upgraded=1` → Save.
+   The `?upgraded=1` is what makes the app wait for the webhook below to
+   activate Pro, then drop the user on their Dashboard with a welcome
+   message (`src/components/PostCheckoutGate.jsx`). This is a per-link
+   Stripe setting — it can't be passed in the link's URL — so repeat it
+   for the **live-mode** Payment Link too when you switch to live.
 5. **Developers → API keys**: copy the **Secret key** (`sk_test_...` for
    now). You'll paste this into Cloudflare in Part C — never into `.env` or
    anywhere in the repo.

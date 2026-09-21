@@ -467,6 +467,11 @@ export const en = {
     cta: 'Upgrade to Pro',
     cancelAnytime: 'Cancel anytime from Settings.',
     alreadyPro: "You're already on Pro — thank you!",
+    activating: 'Payment received — activating your Pro plan…',
+    welcomeProTitle: 'Welcome to Pro!',
+    welcomeProBody: 'Your subscription is active — everything Pro is unlocked.',
+    pendingTitle: 'Payment received',
+    pendingBody: 'Your Pro access can take a minute to show up. If the app still says Free, refresh in a moment.',
     manageInSettings: 'Manage subscription',
   },
 

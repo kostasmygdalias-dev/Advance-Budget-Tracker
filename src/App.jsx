@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Layout from '@/components/Layout';
 import ChunkErrorBoundary, { clearChunkReloadFlag } from '@/components/ChunkErrorBoundary';
+import PostCheckoutGate from '@/components/PostCheckoutGate';
 
 // Each page is its own chunk, so signing in (or any single page) only
 // downloads and parses the JS that page actually needs — e.g. the Login
@@ -47,6 +48,7 @@ const AuthenticatedApp = () => {
   if (isLoadingAuth) return <PageSpinner />;
 
   return (
+    <PostCheckoutGate>
     <ChunkErrorBoundary>
       <Suspense fallback={<PageSpinner />}>
         <Routes>
@@ -76,6 +78,7 @@ const AuthenticatedApp = () => {
         </Routes>
       </Suspense>
     </ChunkErrorBoundary>
+    </PostCheckoutGate>
   );
 };
 
