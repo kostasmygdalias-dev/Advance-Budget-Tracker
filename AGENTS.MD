@@ -9,8 +9,8 @@ user's own Google Drive, read/written directly from the browser via the
 Sheets/Drive APIs — no database for app data, ever.
 
 The exception is `worker/`, a Cloudflare Worker — originally just a
-subscription-status check (Recurring is a Pro feature, enforced
-server-side so it can't be bypassed by editing the browser), now also the
+subscription-status check (Recurring and Insights are Pro features,
+enforced server-side so it can't be bypassed by editing the browser), now also the
 backend for the Viber bot (also Pro): parses a chat message with an LLM and
 acts on the user's Sheet on their behalf. See `BILLING_SETUP.md` and
 `VIBER_SETUP.md` for how each is wired up. It also fronts a `/client-error`
@@ -46,6 +46,20 @@ Do not reintroduce Base44-specific patterns.
 - `src/lib/finance.js`: pure calculation helpers (amortization schedules,
   monthly rollups) plus `formatDateDMY` for turning a stored `YYYY-MM-DD`
   string into the DD-MM-YYYY this app always displays dates as.
+- `src/lib/insights.js`: the month-scoped figures behind the Insights page
+  and its five matching dashboard widgets (biggest expense, top category
+  with a month-over-month delta, spending pace, unusual transaction,
+  recurring vs. one-off). Pure functions, no JSX, so the page and the
+  widgets can't drift apart on the numbers. Two judgment calls live here
+  rather than in either renderer: the pace projection extrapolates only
+  day-by-day spend and adds amortized slices as a fixed addend (blending
+  them overshoots wildly on day 1 of a month), and the outlier check
+  compares against a leave-one-out category mean and ignores amortized
+  purchases, which aren't surprises.
+- `src/components/UpgradePrompt.jsx`: the paywall body a Pro-gated page
+  renders instead of its content. Its `title`/`description`/`features`
+  props default to the Recurring copy it was first written for — pass your
+  own for any other page rather than showing Recurring's wording.
 - `src/hooks/useEntities.js`: the shared React Query cache for
   Categories/Settings (`useCategoriesQuery`/`useSettingsQuery`) — any
   component that needs categories should use this, not its own
@@ -81,6 +95,11 @@ Do not reintroduce Base44-specific patterns.
 - `npm run dev` for local development; `npm run build` produces a static `dist/` deployable anywhere.
 - Run `npm run lint` and the Playwright suite (`npx playwright test`) before finishing code changes — `npm run typecheck` too if present.
 - **Pushing to `master` is a live-deploy action**, not just a save point: GitHub Actions deploys the frontend on every push, and separately deploys `worker/` whenever a push touches `worker/**`. Always build + lint + run the E2E suite locally first (for `worker/**` changes, also `npx wrangler deploy --dry-run` — there's no Worker test suite), push without asking each time once that's clean, then confirm the relevant workflow(s) actually succeeded (GitHub Actions REST API) before calling something done.
-- New data collections should follow the `makeStore(...)` pattern in `sheetsStore.js` (a sheet tab per collection, in the same "ExpenseTrack Data" spreadsheet) rather than introducing a different storage mechanism. Adding a column to an existing collection is safe to do by just appending it to that collection's `SCHEMAS` entry and its `toRow`/`fromRow` pair — existing rows read back with a sensible default for the new field, no migration needed.
+- New data collections should follow the `makeStore(...)` pattern in `sheetsStore.js` (a sheet tab per collection, in the same "ExpenseTrack Data" spreadsheet) rather than introducing a different storage mechanism.
+- **Sheet columns are read by position, not by name** — `fromRow` destructures the row array — so a column can be *appended* to a `SCHEMAS` entry (plus its `toRow`/`fromRow` pair) safely, with existing rows reading back a sensible default and no migration, but it can never be removed or reordered: dropping one shifts every column after it and silently misreads real data. When a feature is cut, delete its UI and leave its column in place, inert. `reconciled` is exactly that — gone from the app, still a column in everyone's sheet.
+- **Adding a dashboard widget**: append `{ id, span }` to `WIDGET_DEFS` in `Dashboard.jsx`, add a `case` to `renderWidget()`, and add a `dashboard.widgets.<id>` key to *both* translation files. Nothing else needs touching — `DEFAULT_LAYOUT`, `normalizeLayout()` (which appends widgets shipped after a user last saved their layout, so a new one never silently hides) and the customize panel all derive from `WIDGET_DEFS`. Mark a Pro-only widget `pro: true` and gate it where `visibleWidgets` is built; do **not** filter the array handed to `DashboardCustomizePanel`, because drag-reordering reports indices into whatever array the panel rendered while `onDragEnd` splices the full `layout` with them — a filtered list would quietly move the wrong rows. The panel takes `proIds` to badge those rows instead.
+- **Pro-gating a page** follows `Recurring.jsx`: `useSubscription()`, fold `subLoading` into the same loading gate as the page's own fetch (not a separate branch, or the page flashes), then `if (billingConfigured && !subActive) return <UpgradePrompt ... />`. The `billingConfigured` half is load-bearing — without it the gate would lock out an install that never configured billing at all.
+- Phone-width list rows have no room for several icon buttons beside a description and an amount. Collapse them into a `DropdownMenu` below `sm` (`hidden sm:flex` for the full set, `sm:hidden` for the menu), give the amount `shrink-0 whitespace-nowrap` and long text `truncate` (which only works with `min-w-0` on its flex ancestor). Keep the Expense and Income row structures element-for-element identical too, or the two stop lining up in a mixed list — an invisible spacer in one of them was enough to shift every icon, description and amount out of alignment.
+- `tests/mocks/googleApi.js`'s `SHEET_HEADERS` can lag the real `SCHEMAS` by a column (`recurring_template_id`). Mostly harmless, since the mock serves rows from A2 down and the header row is cosmetic — but a seed that needs a trailing field must append the value positionally rather than trusting the mock's header list.
 - Auth changes should go through `googleAuth.js`/`AuthContext.jsx`, not a new auth system — there is exactly one sign-in method (Google) by design, since it doubles as the data-access grant.
 - See `DEPLOY.md` for the Google Cloud OAuth Client setup and static-host deployment steps.
