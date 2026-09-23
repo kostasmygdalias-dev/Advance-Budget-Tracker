@@ -580,8 +580,12 @@ export default function Transactions() {
         </div>
       </div>
 
+      {/* Sticky so the actions stay reachable while scrolling further down
+          the list to pick more rows — on a phone the list is long and the
+          bar would otherwise be stranded at the top. `top-14` clears the
+          mobile header (h-14); there's no header at `md` and up. */}
       {selectMode && (
-        <Card className="p-3 flex items-center justify-between gap-3 flex-wrap">
+        <Card className="sticky top-14 md:top-0 z-20 shadow-md p-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <p className="text-sm font-medium tabular-nums">
               {selected.size === 1 ? t('transactions.selectedCountOne', { count: 1 }) : t('transactions.selectedCountOther', { count: selected.size })}
