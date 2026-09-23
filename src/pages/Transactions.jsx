@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -101,21 +100,19 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
         ) : (
           <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
         )}
-        <button onClick={onToggle} className="text-muted-foreground">
-          {e.expense_type === 'amortized' ? (
-            isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
-          ) : (
-            <span className="w-4" />
-          )}
-        </button>
         <CategoryPickerButton categoryId={e.category_id} cat={cat} categories={categories} onPick={onChangeCategory} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-medium truncate">{e.description}</p>
             {e.expense_type === 'amortized' && (
-              <Badge variant="secondary" className="gap-1">
+              <button
+                type="button"
+                onClick={onToggle}
+                className="inline-flex items-center gap-1 rounded-md border border-transparent bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80"
+              >
                 <Layers className="w-3 h-3" /> {t('transactions.amortized')}
-              </Badge>
+                {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              </button>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
