@@ -13,6 +13,7 @@ export const en = {
     delete: 'Delete',
     add: 'Add',
     edit: 'Edit',
+    copy: 'Duplicate',
     income: 'Income',
     expense: 'Expense',
     couldNotSave: 'Could not save',
@@ -218,6 +219,7 @@ export const en = {
     editTransaction: 'Edit "{{description}}"',
     copyTransaction: 'Duplicate "{{description}}"',
     deleteTransaction: 'Delete "{{description}}"',
+    moreActions: 'More actions for "{{description}}"',
   },
 
   recurring: {

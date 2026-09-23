@@ -22,7 +22,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import {
   Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
-  Download, ListChecks, X, Tags,
+  Download, ListChecks, X, Tags, MoreVertical,
 } from 'lucide-react';
 import { monthLabel, currentMonthStr, fmt, todayStr, formatDateDMY } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
@@ -118,19 +118,39 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {cat ? `${cat.name} · ` : ''}{formatDateDMY(e.paid_date)} · {PAYMENT_METHODS.find((m) => m.value === e.payment_method)?.label || e.payment_method}
             {(e.tags || []).length > 0 && ` · ${e.tags.join(', ')}`}
           </p>
         </div>
-        <div className="text-right">
-          <p className="font-semibold tabular-nums">{fmt(e.amount, e.currency)}</p>
+        <div className="text-right shrink-0">
+          <p className="font-semibold tabular-nums whitespace-nowrap">{fmt(e.amount, e.currency)}</p>
         </div>
-        <Link to={`/expenses/${e.id}/edit`}>
-          <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: e.description })}><Pencil className="w-4 h-4" /></Button>
-        </Link>
-        <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: e.description })}><Copy className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: e.description })}><Trash2 className="w-4 h-4" /></Button>
+        {/* Three separate icon buttons don't fit a phone-width row alongside
+            the description/amount without squeezing them to nothing (see
+            git history) — collapsed into one menu below `sm`, kept as
+            individual buttons at their normal size above it. */}
+        <div className="hidden sm:flex items-center shrink-0">
+          <Link to={`/expenses/${e.id}/edit`}>
+            <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: e.description })}><Pencil className="w-4 h-4" /></Button>
+          </Link>
+          <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: e.description })}><Copy className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: e.description })}><Trash2 className="w-4 h-4" /></Button>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="sm:hidden shrink-0" aria-label={t('transactions.moreActions', { description: e.description })}>
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link to={`/expenses/${e.id}/edit`}><Pencil className="w-4 h-4 mr-2" /> {t('common.edit')}</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onCopy}><Copy className="w-4 h-4 mr-2" /> {t('common.copy')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive"><Trash2 className="w-4 h-4 mr-2" /> {t('common.delete')}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {e.expense_type === 'amortized' && isOpen && (e.amortization_schedule || []).length > 0 && (
         <div className="border-t bg-muted/30 p-4">
@@ -166,19 +186,35 @@ function IncomeRow({ i, onCopy, onDelete, onToggleReconciled, selectMode, select
         <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {incomeSources.find((s) => s.value === i.source)?.label || i.source} · {formatDateDMY(i.received_date)}
             {(i.tags || []).length > 0 && ` · ${i.tags.join(', ')}`}
           </p>
         </div>
-        <div className="text-right">
-          <p className="font-semibold tabular-nums text-emerald-600">+{fmt(i.amount, i.currency)}</p>
+        <div className="text-right shrink-0">
+          <p className="font-semibold tabular-nums text-emerald-600 whitespace-nowrap">+{fmt(i.amount, i.currency)}</p>
         </div>
-        <Link to={`/income/${i.id}/edit`}>
-          <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: i.description })}><Pencil className="w-4 h-4" /></Button>
-        </Link>
-        <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: i.description })}><Copy className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: i.description })}><Trash2 className="w-4 h-4" /></Button>
+        <div className="hidden sm:flex items-center shrink-0">
+          <Link to={`/income/${i.id}/edit`}>
+            <Button variant="ghost" size="icon" aria-label={t('transactions.editTransaction', { description: i.description })}><Pencil className="w-4 h-4" /></Button>
+          </Link>
+          <Button variant="ghost" size="icon" onClick={onCopy} aria-label={t('transactions.copyTransaction', { description: i.description })}><Copy className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('transactions.deleteTransaction', { description: i.description })}><Trash2 className="w-4 h-4" /></Button>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="sm:hidden shrink-0" aria-label={t('transactions.moreActions', { description: i.description })}>
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link to={`/income/${i.id}/edit`}><Pencil className="w-4 h-4 mr-2" /> {t('common.edit')}</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onCopy}><Copy className="w-4 h-4 mr-2" /> {t('common.copy')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive"><Trash2 className="w-4 h-4 mr-2" /> {t('common.delete')}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </Card>
   );

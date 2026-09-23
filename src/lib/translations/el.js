@@ -13,6 +13,7 @@ export const el = {
     delete: 'Διαγραφή',
     add: 'Προσθήκη',
     edit: 'Επεξεργασία',
+    copy: 'Αντιγραφή',
     income: 'Έσοδο',
     expense: 'Έξοδο',
     couldNotSave: 'Δεν ήταν δυνατή η αποθήκευση',
@@ -218,6 +219,7 @@ export const el = {
     editTransaction: 'Επεξεργασία «{{description}}»',
     copyTransaction: 'Αντιγραφή «{{description}}»',
     deleteTransaction: 'Διαγραφή «{{description}}»',
+    moreActions: 'Περισσότερες ενέργειες για «{{description}}»',
   },
 
   recurring: {
