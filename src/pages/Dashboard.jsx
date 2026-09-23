@@ -20,6 +20,7 @@ import {
 import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt, formatDateDMY,
 } from '@/lib/finance';
+import { getBiggestExpense, getTopCategory, getBurnRate, getUnusualExpense, getRecurringSplit } from '@/lib/insights';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { CategoryIcon, IconAvatar, PALETTE, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
 import { amountIncludingChildren, buildCategoryReport } from '@/lib/categoryTree';
@@ -99,6 +100,11 @@ const WIDGET_DEFS = [
   { id: 'trend', span: 'full' },
   { id: 'categoryPie', span: 'half' },
   { id: 'sourcePie', span: 'half' },
+  { id: 'biggestExpense', span: 'half', pro: true },
+  { id: 'topCategory', span: 'half', pro: true },
+  { id: 'burnRate', span: 'half', pro: true },
+  { id: 'unusualExpense', span: 'half', pro: true },
+  { id: 'recurringSplit', span: 'half', pro: true },
 ];
 const WIDGET_IDS = WIDGET_DEFS.map((w) => w.id);
 const DEFAULT_LAYOUT = WIDGET_DEFS.map((w) => ({ id: w.id, visible: true }));
@@ -593,6 +599,16 @@ export default function Dashboard() {
   const budgetPct = budget > 0 ? Math.min(100, (budgetPeriodExpenseTotal / budget) * 100) : 0;
   const periodProgressPct = Math.min(100, Math.max(0, ((now - periodStart) / (periodEnd - periodStart)) * 100));
 
+  // Pro-only, so skip the work entirely for a free account — same reasoning
+  // as the recurring-templates fetch above.
+  const biggestExpense = subActive ? getBiggestExpense({ expenses, month: thisMonth, currency }) : null;
+  const topCategoryInsight = subActive
+    ? getTopCategory({ expenses, categories, month: thisMonth, prevMonth: lastMonth, currency, uncategorizedLabel: t('transactions.uncategorized') })
+    : null;
+  const burnRate = subActive ? getBurnRate({ expenses, month: thisMonth, currency, today: now }) : null;
+  const unusualExpense = subActive ? getUnusualExpense({ expenses, month: thisMonth, currency }) : null;
+  const recurringSplit = subActive ? getRecurringSplit({ expenses, month: thisMonth, currency }) : null;
+
   // Toasts once per budget that goes over, per period — not on every load.
   useEffect(() => {
     if (!settings || loading) return;
@@ -827,12 +843,123 @@ export default function Dashboard() {
             )}
           </Card>
         );
+      case 'biggestExpense':
+        return (
+          <Link to="/insights" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">{t('dashboard.widgets.biggestExpense')}</p>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+              {biggestExpense ? (
+                <>
+                  <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">{fmt(biggestExpense.contribution, currency)}</p>
+                  <p className="text-sm text-muted-foreground truncate mt-1">{biggestExpense.expense.description}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">{t('dashboard.noSpendingThisMonth')}</p>
+              )}
+            </Card>
+          </Link>
+        );
+      case 'topCategory':
+        return (
+          <Link to="/insights" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">{t('dashboard.widgets.topCategory')}</p>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+              {topCategoryInsight ? (
+                <>
+                  <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">{fmt(topCategoryInsight.category.total, currency)}</p>
+                  <p className="text-sm text-muted-foreground truncate mt-1">
+                    {topCategoryInsight.category.name}
+                    {topCategoryInsight.deltaPct !== null && (
+                      <span className={topCategoryInsight.deltaPct >= 0 ? 'text-red-500' : 'text-emerald-600'}>
+                        {' '}{topCategoryInsight.deltaPct >= 0 ? '+' : ''}{Math.round(topCategoryInsight.deltaPct)}%
+                      </span>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">{t('dashboard.noSpendingThisMonth')}</p>
+              )}
+            </Card>
+          </Link>
+        );
+      case 'burnRate':
+        return (
+          <Link to="/insights" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">{t('dashboard.widgets.burnRate')}</p>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+              {burnRate ? (
+                <>
+                  <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">{fmt(burnRate.projectedTotal, currency)}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('insights.spentSoFarOf', { spent: fmt(burnRate.spentSoFar, currency) })}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">{t('dashboard.noSpendingThisMonth')}</p>
+              )}
+            </Card>
+          </Link>
+        );
+      case 'unusualExpense':
+        return (
+          <Link to="/insights" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">{t('dashboard.widgets.unusualExpense')}</p>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+              {unusualExpense ? (
+                <>
+                  <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">{fmt(unusualExpense.expense.amount, currency)}</p>
+                  <p className="text-sm text-muted-foreground truncate mt-1">{unusualExpense.expense.description}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">{t('insights.nothingUnusual')}</p>
+              )}
+            </Card>
+          </Link>
+        );
+      case 'recurringSplit':
+        return (
+          <Link to="/insights" className="block group h-full">
+            <Card className="p-5 h-full transition-colors group-hover:border-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">{t('dashboard.widgets.recurringSplit')}</p>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+              {recurringSplit ? (
+                <>
+                  <p className="text-3xl font-heading font-semibold mt-1 tabular-nums">{Math.round(recurringSplit.recurringPct)}%</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('insights.recurringOfSpending')}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">{t('dashboard.noSpendingThisMonth')}</p>
+              )}
+            </Card>
+          </Link>
+        );
       default:
         return null;
     }
   };
 
-  const visibleWidgets = layout.filter((w) => w.visible);
+  // Pro-only widgets stay out of the visible grid for a free account even
+  // if their persisted layout marks them visible (e.g. a lapsed subscription)
+  // — never filtered out of the customize-panel's own list, though, since
+  // that list is index-driven for drag-reordering and removing entries from
+  // it would desync those indices from the full `layout` array.
+  const visibleWidgets = layout.filter((w) => {
+    if (!w.visible) return false;
+    const def = WIDGET_DEFS.find((d) => d.id === w.id);
+    return !def?.pro || subActive;
+  });
   const isEmpty = expenses.length === 0 && incomes.length === 0;
 
   return (
@@ -926,6 +1053,7 @@ export default function Dashboard() {
             <Suspense fallback={<Card className="p-4 h-32 animate-pulse bg-muted/30" />}>
               <DashboardCustomizePanel
                 layout={layout}
+                proIds={subActive ? [] : WIDGET_DEFS.filter((d) => d.pro).map((d) => d.id)}
                 onDragEnd={onDragEnd}
                 onToggleWidget={toggleWidget}
                 onDone={() => setCustomizing(false)}

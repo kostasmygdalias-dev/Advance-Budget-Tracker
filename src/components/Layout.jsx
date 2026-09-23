@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Lightbulb, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useDarkMode } from '@/hooks/use-dark-mode';
@@ -18,11 +18,12 @@ import { cn } from '@/lib/utils';
 const getNav = (t) => [
   { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
   { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
-  { to: '/recurring', label: t('nav.recurring'), icon: Repeat },
+  { to: '/recurring', label: t('nav.recurring'), icon: Repeat, pro: true },
   { to: '/goals', label: t('nav.goals'), icon: Target },
   { to: '/categories', label: t('nav.categories'), icon: FolderTree },
   { to: '/budgets', label: t('nav.budgets'), icon: PiggyBank },
   { to: '/reports', label: t('nav.reports'), icon: BarChart3 },
+  { to: '/insights', label: t('nav.insights'), icon: Lightbulb, pro: true },
   { to: '/settings', label: t('nav.settings'), icon: SettingsIcon },
 ];
 
@@ -160,7 +161,7 @@ export default function Layout() {
                 )}
               >
                 <Icon className="w-4 h-4" /> {item.label}
-                {item.to === '/recurring' && showProBadge && (
+                {item.pro && showProBadge && (
                   <span className="ml-auto text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
                     {t('common.pro')}
                   </span>
@@ -220,7 +221,7 @@ export default function Layout() {
                     )}
                   >
                     <Icon className="w-4 h-4" /> {item.label}
-                    {item.to === '/recurring' && showProBadge && (
+                    {item.pro && showProBadge && (
                       <span className="ml-auto text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
                         {t('common.pro')}
                       </span>

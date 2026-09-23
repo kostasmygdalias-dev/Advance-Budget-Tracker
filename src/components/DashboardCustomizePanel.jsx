@@ -8,7 +8,11 @@ import { useLanguage } from '@/lib/i18n';
 // Its own lazy-loaded chunk (see Dashboard.jsx) — @hello-pangea/dnd is
 // ~30KB gzipped, worth downloading only when someone actually opens the
 // customize panel rather than on every single Dashboard visit.
-export default function DashboardCustomizePanel({ layout, onDragEnd, onToggleWidget, onDone }) {
+// `proIds` is only non-empty for an account that can't actually use those
+// widgets — they stay in the list (removing them would desync the drag
+// indices from the full layout array) but are marked, the same way the
+// sidebar marks the Recurring link.
+export default function DashboardCustomizePanel({ layout, onDragEnd, onToggleWidget, onDone, proIds = [] }) {
   const { t } = useLanguage();
   return (
     <Card className="p-4">
@@ -35,6 +39,11 @@ export default function DashboardCustomizePanel({ layout, onDragEnd, onToggleWid
                         <GripVertical className="w-4 h-4" />
                       </span>
                       <span className={`flex-1 text-sm ${w.visible ? '' : 'text-muted-foreground'}`}>{t(`dashboard.widgets.${w.id}`)}</span>
+                      {proIds.includes(w.id) && (
+                        <span className="text-[10px] font-semibold tracking-wide text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                          {t('common.pro')}
+                        </span>
+                      )}
                       <Switch checked={w.visible} onCheckedChange={() => onToggleWidget(w.id)} />
                     </div>
                   )}

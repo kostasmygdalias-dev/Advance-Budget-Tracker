@@ -23,6 +23,7 @@ const Categories = lazy(() => import('@/pages/Categories'));
 const Recurring = lazy(() => import('@/pages/Recurring'));
 const Goals = lazy(() => import('@/pages/Goals'));
 const Reports = lazy(() => import('@/pages/Reports'));
+const Insights = lazy(() => import('@/pages/Insights'));
 const Budgets = lazy(() => import('@/pages/Budgets'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 const Upgrade = lazy(() => import('@/pages/Upgrade'));
@@ -69,6 +70,7 @@ const AuthenticatedApp = () => {
               <Route path="/recurring" element={<Recurring />} />
               <Route path="/goals" element={<Goals />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/insights" element={<Insights />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/upgrade" element={<Upgrade />} />
