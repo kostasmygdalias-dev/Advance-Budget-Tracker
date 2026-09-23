@@ -88,18 +88,14 @@ function CategoryPickerButton({ categoryId, cat, categories, onPick }) {
   );
 }
 
-function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, onToggleReconciled, selectMode, selected, onToggleSelect }) {
+function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, onCopy, onDelete, selectMode, selected, onToggleSelect }) {
   const { t, lang } = useLanguage();
   const PAYMENT_METHODS = getPaymentMethods(t);
   const color = cat?.color || UNCATEGORIZED_COLOR;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
       <div className="flex items-center gap-3 p-4">
-        {selectMode ? (
-          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
-        ) : (
-          <Checkbox checked={!!e.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
-        )}
+        {selectMode && <Checkbox checked={selected} onCheckedChange={onToggleSelect} />}
         <CategoryPickerButton categoryId={e.category_id} cat={cat} categories={categories} onPick={onChangeCategory} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -168,18 +164,14 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
   );
 }
 
-function IncomeRow({ i, onCopy, onDelete, onToggleReconciled, selectMode, selected, onToggleSelect }) {
+function IncomeRow({ i, onCopy, onDelete, selectMode, selected, onToggleSelect }) {
   const { t } = useLanguage();
   const incomeSources = getIncomeSources(t);
   const SourceIcon = INCOME_SOURCE_ICONS[i.source] || INCOME_SOURCE_ICONS.other;
   return (
     <Card className="p-0 overflow-hidden" style={{ borderLeft: `4px solid ${INCOME_COLOR}` }}>
       <div className="flex items-center gap-3 p-4">
-        {selectMode ? (
-          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
-        ) : (
-          <Checkbox checked={!!i.reconciled} onCheckedChange={onToggleReconciled} title={t('transactions.reconciled')} />
-        )}
+        {selectMode && <Checkbox checked={selected} onCheckedChange={onToggleSelect} />}
         <IconAvatar icon={SourceIcon} color={INCOME_COLOR} />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{i.description}</p>
@@ -428,20 +420,6 @@ export default function Transactions() {
     }
   };
 
-  const toggleReconciled = async (row) => {
-    try {
-      if (row._type === 'expense') {
-        await entities.Expense.update(row.id, { reconciled: !row.reconciled });
-        setExpenses((prev) => prev.map((e) => (e.id === row.id ? { ...e, reconciled: !e.reconciled } : e)));
-      } else {
-        await entities.Income.update(row.id, { reconciled: !row.reconciled });
-        setIncomes((prev) => prev.map((i) => (i.id === row.id ? { ...i, reconciled: !i.reconciled } : i)));
-      }
-    } catch (err) {
-      toast({ title: t('common.couldNotUpdate'), description: err.message, variant: 'destructive' });
-    }
-  };
-
   // Optimistic delete with an Undo action, instead of a confirm dialog —
   // faster for the common case, and just as safe since Undo re-creates the
   // row (as a new record; Sheets rows have no stable way to "un-delete").
@@ -535,7 +513,6 @@ export default function Transactions() {
       { key: 'currency', label: t('transactions.csvCurrency') },
       { key: 'methodOrSource', label: t('transactions.csvMethodOrSource') },
       { key: 'notes', label: t('transactions.csvNotes') },
-      { key: 'reconciled', label: t('transactions.csvReconciled') },
     ];
     const rows = filtered.map((row) => ({
       type: row._type === 'income' ? t('common.income') : t('common.expense'),
@@ -548,7 +525,6 @@ export default function Transactions() {
         ? (PAYMENT_METHODS.find((m) => m.value === row.payment_method)?.label || row.payment_method)
         : (incomeSources.find((s) => s.value === row.source)?.label || row.source),
       notes: row.notes || '',
-      reconciled: row.reconciled ? t('transactions.csvReconciled') : '',
     }));
     downloadCsv(`transactions-${todayStr()}.csv`, columns, rows);
   };
@@ -767,7 +743,6 @@ export default function Transactions() {
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
               onCopy={() => copyRow(row)}
               onDelete={() => deleteRow(row)}
-              onToggleReconciled={() => toggleReconciled(row)}
               selectMode={selectMode}
               selected={selected.has(selectionKey(row))}
               onToggleSelect={() => toggleSelect(row)}
@@ -778,7 +753,6 @@ export default function Transactions() {
               i={row}
               onCopy={() => copyRow(row)}
               onDelete={() => deleteRow(row)}
-              onToggleReconciled={() => toggleReconciled(row)}
               selectMode={selectMode}
               selected={selected.has(selectionKey(row))}
               onToggleSelect={() => toggleSelect(row)}
