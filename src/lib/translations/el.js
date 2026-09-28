@@ -62,6 +62,15 @@ export const el = {
     debts: 'Χρέη & Οφειλές',
   },
 
+  dateInput: {
+    day: 'Ημέρα',
+    month: 'Μήνας',
+    year: 'Έτος',
+    openCalendar: 'Άνοιγμα ημερολογίου',
+    previousMonth: 'Προηγούμενος μήνας',
+    nextMonth: 'Επόμενος μήνας',
+  },
+
   accountMenu: {
     proPlan: 'Πρόγραμμα Pro',
     freePlan: 'Δωρεάν πρόγραμμα',

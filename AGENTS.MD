@@ -75,7 +75,16 @@ Do not reintroduce Base44-specific patterns.
   `lang` attribute has no effect on it), which can't be forced to match this
   app's DD/MM/YYYY convention. `DateInput` always displays/types DD/MM/YYYY
   while still storing and emitting the plain `YYYY-MM-DD` string every other
-  date field uses.
+  date field uses, and pairs with `ui/calendar.jsx` for picking a day
+  visually. Day, month and year are three separate inputs so one can be
+  corrected on its own — arrow keys step a part, typing auto-advances, and
+  the parts select themselves on click so typing replaces rather than
+  inserts. Two things it has to guard against, both of which caused real
+  bugs: the value it emits comes straight back as a prop zero-padded, so it
+  ignores that echo (otherwise typing "2" into the day returns as "02" and
+  the next digit lands on it), and auto-advancing blurs a part before React
+  has re-rendered, so handlers read the parts from a ref rather than a
+  render-scoped copy.
 - `src/lib/subscription.js` / `src/hooks/use-subscription.js`: client for the billing Worker — fails open (full access) when billing env vars aren't set, so this stays inert until `BILLING_SETUP.md` is followed.
 - `worker/`: the Cloudflare Worker backing billing, the Viber bot, error
   reporting, and rate limiting (see Project Context above). Separate
@@ -101,5 +110,6 @@ Do not reintroduce Base44-specific patterns.
 - **Pro-gating a page** follows `Recurring.jsx`: `useSubscription()`, fold `subLoading` into the same loading gate as the page's own fetch (not a separate branch, or the page flashes), then `if (billingConfigured && !subActive) return <UpgradePrompt ... />`. The `billingConfigured` half is load-bearing — without it the gate would lock out an install that never configured billing at all.
 - Phone-width list rows have no room for several icon buttons beside a description and an amount. Collapse them into a `DropdownMenu` below `sm` (`hidden sm:flex` for the full set, `sm:hidden` for the menu), give the amount `shrink-0 whitespace-nowrap` and long text `truncate` (which only works with `min-w-0` on its flex ancestor). Keep the Expense and Income row structures element-for-element identical too, or the two stop lining up in a mixed list — an invisible spacer in one of them was enough to shift every icon, description and amount out of alignment.
 - `tests/mocks/googleApi.js`'s `SHEET_HEADERS` can lag the real `SCHEMAS` by a column (`recurring_template_id`). Mostly harmless, since the mock serves rows from A2 down and the header row is cosmetic — but a seed that needs a trailing field must append the value positionally rather than trusting the mock's header list.
+- The mock hands the app the seed's own row arrays and writes mutate them in place, so a `const seed` shared by several tests in one file leaks whatever the first test saved into the rest (they share a module instance within a worker). Build the seed per test with a small factory whenever a test saves anything.
 - Auth changes should go through `googleAuth.js`/`AuthContext.jsx`, not a new auth system — there is exactly one sign-in method (Google) by design, since it doubles as the data-access grant.
 - See `DEPLOY.md` for the Google Cloud OAuth Client setup and static-host deployment steps.

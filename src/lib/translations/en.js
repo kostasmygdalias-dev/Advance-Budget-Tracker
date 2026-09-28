@@ -62,6 +62,15 @@ export const en = {
     debts: 'Debts & IOUs',
   },
 
+  dateInput: {
+    day: 'Day',
+    month: 'Month',
+    year: 'Year',
+    openCalendar: 'Open calendar',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+  },
+
   accountMenu: {
     proPlan: 'Pro plan',
     freePlan: 'Free plan',

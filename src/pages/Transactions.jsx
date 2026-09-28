@@ -617,7 +617,7 @@ export default function Transactions() {
               <DateInput
                 id="txn-from" value={dateRange.from}
                 onChange={(v) => setDateRange((r) => ({ ...r, from: v }))}
-                className="w-32"
+                className="w-44"
               />
             </div>
             <div className="space-y-1.5">
@@ -625,7 +625,7 @@ export default function Transactions() {
               <DateInput
                 id="txn-to" value={dateRange.to}
                 onChange={(v) => setDateRange((r) => ({ ...r, to: v }))}
-                className="w-32"
+                className="w-44"
               />
             </div>
             <Button variant="ghost" size="sm" onClick={clearCustomRange}>{t('transactions.useMonthView')}</Button>
