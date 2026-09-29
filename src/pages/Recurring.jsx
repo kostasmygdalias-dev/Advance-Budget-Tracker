@@ -15,7 +15,7 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
-import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
+import { addDays, addMonths, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { shortMonth, parseDateLocal, fmt, CURRENCIES, formatDateDMY } from '@/lib/finance';
@@ -25,6 +25,7 @@ import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/use-subscription';
+import { advanceDate, generateDueRecurring } from '@/lib/recurring';
 import { useLanguage } from '@/lib/i18n';
 
 const getFrequencies = (t) => [
@@ -38,16 +39,6 @@ const getTypes = (t) => [
   { value: 'expense', label: t('common.expense') },
   { value: 'income', label: t('common.income') },
 ];
-
-function advanceDate(dateStr, frequency, customDays) {
-  // Parse as local calendar components, not `new Date(dateStr)` (UTC midnight),
-  // which can roll a month-start date back a day for timezones west of UTC.
-  const d = parseDateLocal(dateStr);
-  if (frequency === 'daily') return addDays(d, 1);
-  if (frequency === 'weekly') return addWeeks(d, 1);
-  if (frequency === 'monthly') return addMonths(d, 1);
-  return addDays(d, customDays || 1);
-}
 
 function regressDate(dateStr, frequency, customDays) {
   const d = parseDateLocal(dateStr);
@@ -132,56 +123,6 @@ export default function Recurring() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingHistory, setDeletingHistory] = useState(false);
 
-  // Creates the actual Expense/Income entry for a due template and advances
-  // its next_due_date — repeated in a loop so a template nobody's touched in
-  // a while catches up on every occurrence it missed, not just the latest.
-  const generateOne = async (t) => {
-    if (t.type === 'income') {
-      await entities.Income.create({
-        description: t.description,
-        amount: t.amount,
-        currency: t.currency || defaultCurrency,
-        received_date: t.next_due_date,
-        source: t.source || 'other',
-        tags: ['recurring'],
-        recurring_template_id: t.id,
-      });
-    } else {
-      await entities.Expense.create({
-        description: t.description,
-        amount: t.amount,
-        currency: t.currency || defaultCurrency,
-        paid_date: t.next_due_date,
-        category_id: t.category_id || null,
-        payment_method: 'card',
-        expense_type: 'single',
-        amortization_schedule: [],
-        tags: ['recurring'],
-        recurring_template_id: t.id,
-      });
-    }
-    const next = advanceDate(t.next_due_date, t.frequency, t.custom_interval_days);
-    const next_due_date = format(next, 'yyyy-MM-dd');
-    await entities.RecurringTemplate.update(t.id, { next_due_date });
-    return next_due_date;
-  };
-
-  const catchUp = async (list) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    let generated = 0;
-    for (const t of list) {
-      if (!t.active) continue;
-      let dueDate = t.next_due_date;
-      let iterations = 0;
-      while (dueDate && dueDate <= today && iterations < 24) {
-        dueDate = await generateOne({ ...t, next_due_date: dueDate });
-        generated++;
-        iterations++;
-      }
-    }
-    return generated;
-  };
-
   // One-time self-heal for templates created before RecurringTemplate had a
   // category_id column, run once per device (flag below) rather than on
   // every visit — by design there's nothing left to fix after the first
@@ -230,8 +171,8 @@ export default function Recurring() {
     setLoadError(null);
     (async () => {
       try {
+        const generated = await generateDueRecurring();
         const list = await entities.RecurringTemplate.list();
-        const generated = await catchUp(list);
         const { templates: templatesFixed, expenses: expensesFixed } = await backfillTemplateCategories(list);
         setTemplates(generated > 0 || templatesFixed > 0 ? await entities.RecurringTemplate.list() : list);
         if (generated > 0) {
@@ -295,11 +236,10 @@ export default function Recurring() {
       category_id: isIncome ? null : (editing.category_id || null),
     };
     try {
-      const saved = editing.id
-        ? await entities.RecurringTemplate.update(editing.id, payload)
-        : await entities.RecurringTemplate.create(payload);
+      if (editing.id) await entities.RecurringTemplate.update(editing.id, payload);
+      else await entities.RecurringTemplate.create(payload);
       setEditing(null);
-      const generated = await catchUp([saved]);
+      const generated = await generateDueRecurring();
       load();
       if (generated > 0) {
         toast({

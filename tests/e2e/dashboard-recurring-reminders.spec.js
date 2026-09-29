@@ -14,10 +14,13 @@ function inDays(n) {
 // templates are one — surfaces active templates due within the next 7 days
 // and nothing else: not templates further out, and not paused ones. See
 // UPCOMING_RECURRING_WINDOW_DAYS / upcomingRecurring in src/pages/Dashboard.jsx.
+// Nothing here is due *today*: opening the app now creates a due entry on
+// the spot (see src/hooks/use-recurring-catch-up.js), which moves that
+// template on to next month — it's recorded, not upcoming.
 const seed = {
   RecurringTemplate: [
     SHEET_HEADERS.RecurringTemplate,
-    ['tpl-today', 'Due Today', 10, 'EUR', 'monthly', '', inDays(0), true, CREATED, 'expense', ''],
+    ['tpl-tomorrow', 'Due Tomorrow', 10, 'EUR', 'monthly', '', inDays(1), true, CREATED, 'expense', ''],
     ['tpl-soon', 'Due Soon', 20, 'EUR', 'monthly', '', inDays(3), true, CREATED, 'expense', ''],
     ['tpl-far', 'Too Far', 30, 'EUR', 'monthly', '', inDays(10), true, CREATED, 'expense', ''],
     ['tpl-paused', 'Paused Bill', 40, 'EUR', 'monthly', '', inDays(2), false, CREATED, 'expense', ''],
@@ -46,8 +49,8 @@ test('Dashboard reminds about active recurring charges due within 7 days, and no
   await bellButton.click();
   const popover = page.getByRole('dialog');
   await expect(popover.getByText('2 upcoming charges due soon', { exact: true })).toBeVisible();
-  await expect(popover.getByText('Due Today', { exact: true })).toBeVisible();
-  await expect(popover.getByText('Due today', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due Tomorrow', { exact: true })).toBeVisible();
+  await expect(popover.getByText('Due tomorrow', { exact: true })).toBeVisible();
   await expect(popover.getByText('Due Soon', { exact: true })).toBeVisible();
   await expect(popover.getByText('Due in 3 days', { exact: true })).toBeVisible();
 

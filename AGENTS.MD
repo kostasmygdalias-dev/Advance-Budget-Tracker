@@ -60,6 +60,16 @@ Do not reintroduce Base44-specific patterns.
   renders instead of its content. Its `title`/`description`/`features`
   props default to the Recurring copy it was first written for — pass your
   own for any other page rather than showing Recurring's wording.
+- `src/lib/recurring.js`: `generateDueRecurring()` creates every recurring
+  entry that has come due — one per missed occurrence, each on its own due
+  date. It runs on every app open (`src/hooks/use-recurring-catch-up.js`,
+  mounted in `Layout`, Pro only) as well as on the Recurring page's load and
+  save; there's no server to do it on the due date itself. Always go through
+  this function rather than writing another catch-up loop: runs are chained
+  so two never overlap, and each re-reads the templates, because a second
+  loop working from an already-fetched list would recreate the same entries.
+  When it creates anything, `Layout` remounts the current page so its
+  already-loaded data picks them up.
 - `src/hooks/useEntities.js`: the shared React Query cache for
   Categories/Settings (`useCategoriesQuery`/`useSettingsQuery`) — any
   component that needs categories should use this, not its own

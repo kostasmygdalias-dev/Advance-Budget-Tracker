@@ -3,6 +3,7 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Lightbulb, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useRecurringCatchUp } from '@/hooks/use-recurring-catch-up';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useLanguage } from '@/lib/i18n';
 import { openBillingPortal } from '@/lib/subscription';
@@ -105,6 +106,11 @@ export default function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   const { t } = useLanguage();
   const NAV = getNav(t);
+
+  // Bumped when due recurring entries get created in the background, to
+  // remount the current page so whatever it already loaded picks them up.
+  const [contentKey, setContentKey] = useState(0);
+  useRecurringCatchUp(!subLoading && subActive, () => setContentKey((k) => k + 1));
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -264,7 +270,7 @@ export default function Layout() {
 
       <main className="md:pl-60">
         <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-10">
-          <Outlet />
+          <Outlet key={contentKey} />
         </div>
       </main>
 
