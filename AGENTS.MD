@@ -69,7 +69,12 @@ Do not reintroduce Base44-specific patterns.
   so two never overlap, and each re-reads the templates, because a second
   loop working from an already-fetched list would recreate the same entries.
   When it creates anything, `Layout` remounts the current page so its
-  already-loaded data picks them up.
+  already-loaded data picks them up. Monthly templates step via
+  `shiftMonths`/`anchor_day`, never plain `addMonths`: the due date alone
+  can't remember that a template is meant for the 31st once February has
+  clamped it to the 28th. The anchor is set from the date picked in the
+  form, kept when a template is saved without changing its date, and
+  captured on the first run for templates saved before the column existed.
 - `src/hooks/useEntities.js`: the shared React Query cache for
   Categories/Settings (`useCategoriesQuery`/`useSettingsQuery`) — any
   component that needs categories should use this, not its own

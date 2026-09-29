@@ -15,7 +15,7 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
-import { addDays, addMonths, subDays, subMonths, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
+import { addDays, addMonths, subDays, subWeeks, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
 import { shortMonth, parseDateLocal, fmt, CURRENCIES, formatDateDMY } from '@/lib/finance';
@@ -25,7 +25,7 @@ import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/use-subscription';
-import { advanceDate, generateDueRecurring } from '@/lib/recurring';
+import { advanceDate, anchorDayOf, generateDueRecurring, shiftMonths } from '@/lib/recurring';
 import { useLanguage } from '@/lib/i18n';
 
 const getFrequencies = (t) => [
@@ -40,11 +40,23 @@ const getTypes = (t) => [
   { value: 'income', label: t('common.income') },
 ];
 
-function regressDate(dateStr, frequency, customDays) {
+// A date picked in the form is the day the template means — the 31st stays
+// the 31st in every month long enough to have one. But a template due on the
+// 31st shows the 28th while it's in February, so saving it untouched (say,
+// only the amount changed) must keep the 31st, not adopt the 28th.
+function anchorForSave(editing, original) {
+  if (editing.frequency !== 'monthly' || !editing.next_due_date) return null;
+  if (original && original.frequency === 'monthly' && original.next_due_date === editing.next_due_date) {
+    return anchorDayOf(original);
+  }
+  return parseDateLocal(editing.next_due_date).getDate();
+}
+
+function regressDate(dateStr, frequency, customDays, anchorDay) {
   const d = parseDateLocal(dateStr);
   if (frequency === 'daily') return subDays(d, 1);
   if (frequency === 'weekly') return subWeeks(d, 1);
-  if (frequency === 'monthly') return subMonths(d, 1);
+  if (frequency === 'monthly') return shiftMonths(dateStr, -1, anchorDay);
   return subDays(d, customDays || 1);
 }
 
@@ -54,7 +66,7 @@ function regressDate(dateStr, frequency, customDays) {
 // minus one period represents).
 function cycleProgress(t) {
   const cycleEnd = parseDateLocal(t.next_due_date);
-  const cycleStart = regressDate(t.next_due_date, t.frequency, t.custom_interval_days);
+  const cycleStart = regressDate(t.next_due_date, t.frequency, t.custom_interval_days, anchorDayOf(t));
   const today = new Date();
   const totalMs = cycleEnd - cycleStart;
   const elapsedMs = Math.min(Math.max(today - cycleStart, 0), totalMs);
@@ -96,7 +108,7 @@ function forecastRecurring(templates, defaultCurrency, lang) {
       next365 += signed;
       const idx = differenceInCalendarMonths(d, today);
       if (idx >= 0 && idx < 12) monthly[idx].total += signed;
-      d = advanceDate(format(d, 'yyyy-MM-dd'), t.frequency, t.custom_interval_days);
+      d = advanceDate(format(d, 'yyyy-MM-dd'), t.frequency, t.custom_interval_days, anchorDayOf(t));
       iterations++;
     }
   });
@@ -231,6 +243,7 @@ export default function Recurring() {
       frequency: editing.frequency,
       custom_interval_days: editing.frequency === 'custom_days' ? parseInt(editing.custom_interval_days) || 1 : null,
       next_due_date: editing.next_due_date,
+      anchor_day: anchorForSave(editing, templates.find((x) => x.id === editing.id)),
       active: editing.active,
       source: isIncome ? (editing.source || 'other') : null,
       category_id: isIncome ? null : (editing.category_id || null),
