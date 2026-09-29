@@ -23,7 +23,7 @@ import {
   Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Copy, Trash2, Layers,
   Download, ListChecks, X, Tags, MoreVertical,
 } from 'lucide-react';
-import { monthLabel, currentMonthStr, fmt, todayStr, formatDateDMY } from '@/lib/finance';
+import { monthLabel, currentMonthStr, fmt, todayStr, formatDateDMY, getMonthlyContribution } from '@/lib/finance';
 import { getIncomeSources, INCOME_SOURCE_ICONS } from '@/components/IncomeForm';
 import { getPaymentMethods } from '@/components/ExpenseForm';
 import { CategoryIcon, IconAvatar, UNCATEGORIZED_COLOR } from '@/lib/categoryIcons';
@@ -117,7 +117,12 @@ function ExpenseRow({ e, cat, categories, onChangeCategory, isOpen, onToggle, on
           </p>
         </div>
         <div className="text-right shrink-0">
-          <p className="font-semibold tabular-nums whitespace-nowrap">{fmt(e.amount, e.currency)}</p>
+          <p className="font-semibold tabular-nums whitespace-nowrap">{fmt(e._monthAmount ?? e.amount, e.currency)}</p>
+          {e._monthAmount != null && e._monthAmount !== e.amount && (
+            <p className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+              {t('transactions.shareOfTotal', { total: fmt(e.amount, e.currency) })}
+            </p>
+          )}
         </div>
         {/* Three separate icon buttons don't fit a phone-width row alongside
             the description/amount without squeezing them to nothing (see
@@ -328,13 +333,22 @@ export default function Transactions() {
   }, [filters.category_ids, categories]);
   const includesUncategorized = filters.category_ids.includes('uncategorized');
 
+  // An amortized expense belongs to every month its schedule covers, not
+  // only the one it was paid in — that's what every total elsewhere
+  // (Dashboard, Reports, Budgets, Insights) already counts, so a month here
+  // that left it out disagreed with all of them. Only the month view does
+  // this: a custom range can cut a month in half, and the schedule is
+  // month-granular, so there'd be no honest amount to show for part of one.
+  const isSpreadOver = (row, monthStr) =>
+    row._type === 'expense' && row.expense_type === 'amortized' && getMonthlyContribution(row, monthStr) > 0;
+
   const filtered = useMemo(() => {
     const hasCustomRange = dateRange.from || dateRange.to;
-    return combined.filter((row) => {
+    const rows = combined.filter((row) => {
       if (hasCustomRange) {
         if (dateRange.from && (row._date || '') < dateRange.from) return false;
         if (dateRange.to && (row._date || '') > dateRange.to) return false;
-      } else if (month && !(row._date || '').startsWith(month)) return false;
+      } else if (month && !(row._date || '').startsWith(month) && !isSpreadOver(row, month)) return false;
       if (type !== 'all' && row._type !== type) return false;
       if (filters.search) {
         const term = filters.search.trim().toLowerCase();
@@ -360,6 +374,14 @@ export default function Transactions() {
       }
       return true;
     });
+
+    // In a month view an amortized row stands for that month's installment,
+    // so that's the amount it carries everywhere below — the row, the
+    // header total and the CSV.
+    if (!month || dateRange.from || dateRange.to) return rows;
+    return rows.map((row) => (isSpreadOver(row, month)
+      ? { ...row, _monthAmount: getMonthlyContribution(row, month) }
+      : row));
   }, [combined, type, month, filters, dateRange, categoryFilterIds]);
 
   // Grouped by currency rather than blindly summed — mixing currencies into
@@ -368,7 +390,8 @@ export default function Transactions() {
     const byCurrency = {};
     filtered.forEach((row) => {
       const cur = row.currency || 'EUR';
-      const signed = row._type === 'income' ? row.amount : -row.amount;
+      const amount = row._monthAmount ?? row.amount;
+      const signed = row._type === 'income' ? amount : -amount;
       byCurrency[cur] = (byCurrency[cur] || 0) + signed;
     });
     return byCurrency;
@@ -381,7 +404,7 @@ export default function Transactions() {
       if (row._type === 'expense') {
         await entities.Expense.create({
           description: row.description,
-          amount: row.amount,
+          amount: row._monthAmount ?? row.amount,
           currency: row.currency,
           paid_date: todayStr(),
           category_id: row.category_id,

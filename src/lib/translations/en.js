@@ -194,6 +194,7 @@ export const en = {
     allMethods: 'All methods',
     allSources: 'All sources',
     noMatches: 'No transactions match your filters.',
+    shareOfTotal: 'of {{total}}',
     amortized: 'Amortized',
     scheduleHeading: '{{value}} {{unit}} · schedule',
     copied: 'Copied',

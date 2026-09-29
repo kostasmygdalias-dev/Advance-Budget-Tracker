@@ -194,6 +194,7 @@ export const el = {
     allMethods: 'Όλες οι μέθοδοι',
     allSources: 'Όλες οι πηγές',
     noMatches: 'Καμία συναλλαγή δεν ταιριάζει με τα φίλτρα σας.',
+    shareOfTotal: 'από {{total}}',
     amortized: 'Αποσβεσμένο',
     scheduleHeading: '{{value}} {{unit}} · πρόγραμμα δόσεων',
     copied: 'Αντιγράφηκε',
