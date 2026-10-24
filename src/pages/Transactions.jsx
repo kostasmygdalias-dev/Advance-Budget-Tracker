@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { entities } from '@/lib/sheetsStore';
+import { entities, deleteRecurringOccurrences } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -240,6 +240,7 @@ export default function Transactions() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [recurringDeleteRow, setRecurringDeleteRow] = useState(null);
   const [filters, setFilters] = useState({
     search: '', category_ids: searchParams.get('category') ? [searchParams.get('category')] : [],
     payment_method: 'all', source: 'all',
@@ -454,6 +455,49 @@ export default function Transactions() {
       toast({ title: t('transactions.restoredToastTitle') });
     } catch (err) {
       toast({ title: t('transactions.couldNotRestore'), description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // An entry a recurring template generated has siblings in other months, so
+  // deleting it asks whether to take those too rather than going straight
+  // to the optimistic single delete below.
+  const siblingsOf = (row) => (row._type === 'expense' ? expenses : incomes)
+    .filter((r) => r.recurring_template_id === row.recurring_template_id);
+  const requestDelete = (row) => {
+    if (row.recurring_template_id && siblingsOf(row).length > 1) setRecurringDeleteRow(row);
+    else deleteRow(row);
+  };
+
+  const undoDeleteAll = async (rows, type) => {
+    try {
+      const store = type === 'expense' ? entities.Expense : entities.Income;
+      const created = [];
+      // Sequential: parallel appends to one sheet aren't guaranteed to all land.
+      for (const row of rows) created.push(await store.create(row));
+      if (type === 'expense') setExpenses((prev) => [...prev, ...created]);
+      else setIncomes((prev) => [...prev, ...created]);
+      toast({ title: t('transactions.restoredToastTitle') });
+    } catch (err) {
+      toast({ title: t('transactions.couldNotRestore'), description: err.message, variant: 'destructive' });
+      load();
+    }
+  };
+
+  const deleteAllOccurrences = async (row) => {
+    setRecurringDeleteRow(null);
+    const templateId = row.recurring_template_id;
+    const drop = (prev) => prev.filter((r) => r.recurring_template_id !== templateId);
+    if (row._type === 'expense') setExpenses(drop);
+    else setIncomes(drop);
+    try {
+      const deleted = await deleteRecurringOccurrences(templateId, row._type);
+      toast({
+        title: t('transactions.recurringDeletedAll', { count: deleted.length }),
+        action: <ToastAction altText={t('transactions.undo')} onClick={() => undoDeleteAll(deleted, row._type)}>{t('transactions.undo')}</ToastAction>,
+      });
+    } catch (err) {
+      toast({ title: t('common.couldNotDelete'), description: err.message, variant: 'destructive' });
+      load();
     }
   };
 
@@ -765,7 +809,7 @@ export default function Transactions() {
               isOpen={!!expanded[row.id]}
               onToggle={() => setExpanded((s) => ({ ...s, [row.id]: !s[row.id] }))}
               onCopy={() => copyRow(row)}
-              onDelete={() => deleteRow(row)}
+              onDelete={() => requestDelete(row)}
               selectMode={selectMode}
               selected={selected.has(selectionKey(row))}
               onToggleSelect={() => toggleSelect(row)}
@@ -775,7 +819,7 @@ export default function Transactions() {
               key={row.id}
               i={row}
               onCopy={() => copyRow(row)}
-              onDelete={() => deleteRow(row)}
+              onDelete={() => requestDelete(row)}
               selectMode={selectMode}
               selected={selected.has(selectionKey(row))}
               onToggleSelect={() => toggleSelect(row)}
@@ -783,6 +827,35 @@ export default function Transactions() {
           )
         )}
       </div>
+
+      <AlertDialog open={!!recurringDeleteRow} onOpenChange={(open) => { if (!open) setRecurringDeleteRow(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('transactions.recurringDeleteTitle', { description: recurringDeleteRow?.description })}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {recurringDeleteRow && t('transactions.recurringDeleteBody', { count: siblingsOf(recurringDeleteRow).length })}
+            </AlertDialogDescription>
+            <p className="text-xs text-muted-foreground">{t('transactions.recurringDeleteNote')}</p>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => { const row = recurringDeleteRow; setRecurringDeleteRow(null); deleteRow(row); }}
+              className={buttonVariants({ variant: 'outline', className: 'w-full' })}
+            >
+              {t('transactions.recurringDeleteThisOnly')}
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteAllOccurrences(recurringDeleteRow)}
+              className={buttonVariants({ variant: 'destructive', className: 'w-full' })}
+            >
+              {recurringDeleteRow && t('transactions.recurringDeleteAll', { count: siblingsOf(recurringDeleteRow).length })}
+            </button>
+            <AlertDialogCancel className="w-full mt-0">{t('common.cancel')}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>

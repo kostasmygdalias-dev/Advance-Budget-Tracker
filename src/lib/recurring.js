@@ -1,4 +1,4 @@
-import { addDays, addWeeks, format } from 'date-fns';
+import { addDays, addWeeks, subDays, subWeeks, format } from 'date-fns';
 import { entities } from '@/lib/sheetsStore';
 import { parseDateLocal } from '@/lib/finance';
 
@@ -31,33 +31,47 @@ export function advanceDate(dateStr, frequency, customDays, anchorDay) {
   return addDays(d, customDays || 1);
 }
 
+export function regressDate(dateStr, frequency, customDays, anchorDay) {
+  const d = parseDateLocal(dateStr);
+  if (frequency === 'daily') return subDays(d, 1);
+  if (frequency === 'weekly') return subWeeks(d, 1);
+  if (frequency === 'monthly') return shiftMonths(dateStr, -1, anchorDay);
+  return subDays(d, customDays || 1);
+}
+
 const MAX_CATCH_UP_PER_TEMPLATE = 24;
 
-async function generateOne(t, defaultCurrency) {
+// The entry a template produces for one occurrence. Leaves the template's
+// due date alone — that's generateOne's job, and restoring a missed past
+// occurrence mustn't move it.
+export async function createOccurrence(t, date, defaultCurrency) {
   if (t.type === 'income') {
-    await entities.Income.create({
+    return entities.Income.create({
       description: t.description,
       amount: t.amount,
       currency: t.currency || defaultCurrency,
-      received_date: t.next_due_date,
+      received_date: date,
       source: t.source || 'other',
       tags: ['recurring'],
       recurring_template_id: t.id,
     });
-  } else {
-    await entities.Expense.create({
-      description: t.description,
-      amount: t.amount,
-      currency: t.currency || defaultCurrency,
-      paid_date: t.next_due_date,
-      category_id: t.category_id || null,
-      payment_method: 'card',
-      expense_type: 'single',
-      amortization_schedule: [],
-      tags: ['recurring'],
-      recurring_template_id: t.id,
-    });
   }
+  return entities.Expense.create({
+    description: t.description,
+    amount: t.amount,
+    currency: t.currency || defaultCurrency,
+    paid_date: date,
+    category_id: t.category_id || null,
+    payment_method: 'card',
+    expense_type: 'single',
+    amortization_schedule: [],
+    tags: ['recurring'],
+    recurring_template_id: t.id,
+  });
+}
+
+async function generateOne(t, defaultCurrency) {
+  await createOccurrence(t, t.next_due_date, defaultCurrency);
   const anchor_day = t.frequency === 'monthly' ? anchorDayOf(t) : t.anchor_day ?? null;
   const next_due_date = format(advanceDate(t.next_due_date, t.frequency, t.custom_interval_days, anchor_day), 'yyyy-MM-dd');
   // Writing the anchor back captures it for templates saved before the
@@ -102,4 +116,40 @@ export function generateDueRecurring() {
   // A failed run mustn't wedge every later one behind it.
   queue = run.catch(() => {});
   return run;
+}
+
+const MAX_MISSING_LOOKBACK = 400;
+const entryDate = (e) => e.paid_date || e.received_date;
+const sameText = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
+// The occurrences a template has already passed (everything before its
+// next_due_date, back to `fromDate`) that have no entry left. An occurrence
+// counts as covered by any entry in its own period, not just on its exact
+// day, so one whose date was edited by hand isn't reported; and by an
+// unlinked entry with the same description and amount, so one re-typed by
+// hand after a deletion isn't restored a second time.
+export function findMissingOccurrences(t, entries, fromDate) {
+  if (!t.next_due_date || !fromDate) return [];
+  const anchor = t.frequency === 'monthly' ? anchorDayOf(t) : t.anchor_day;
+  const own = entries.filter((e) => e.recurring_template_id === t.id
+    || (!e.recurring_template_id && sameText(e.description, t.description) && Number(e.amount) === Number(t.amount)));
+  const missing = [];
+  let periodEnd = t.next_due_date;
+  for (let i = 0; i < MAX_MISSING_LOOKBACK; i++) {
+    const due = format(regressDate(periodEnd, t.frequency, t.custom_interval_days, anchor), 'yyyy-MM-dd');
+    if (due < fromDate) break;
+    const end = periodEnd;
+    if (!own.some((e) => entryDate(e) >= due && entryDate(e) < end)) missing.push(due);
+    periodEnd = due;
+  }
+  return missing.reverse();
+}
+
+// Where the missing-entries check starts by default: the template's oldest
+// entry still around. Gaps after it are certain; anything before it can't
+// be told apart from the template simply not having existed yet, which is
+// why the check also lets an earlier start be picked by hand.
+export function earliestOccurrence(t, entries) {
+  const dates = entries.filter((e) => e.recurring_template_id === t.id).map(entryDate).filter(Boolean).sort();
+  return dates[0] || null;
 }

@@ -38,8 +38,11 @@ test('Recurring delete can keep or remove generated history', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Recurring' })).toBeVisible();
 
   // "Delete template only" — the template goes away, its past entries stay.
-  const onlyRow = page.locator('div.rounded-xl', { has: page.getByText('Only Template', { exact: true }) });
-  await onlyRow.locator('button').nth(2).click();
+  // Waits out the page-transition moment where the outgoing and incoming
+  // copies of the page are both mounted.
+  const deleteOnly = page.getByRole('button', { name: 'Delete "Only Template"', exact: true });
+  await expect(deleteOnly).toHaveCount(1);
+  await deleteOnly.click();
   await expect(page.getByRole('heading', { name: 'Delete "Only Template"?' })).toBeVisible();
   await page.getByRole('button', { name: 'Delete template only (keep past entries)' }).click();
   await expect(page.getByText('Only Template', { exact: true })).toHaveCount(0);
@@ -53,8 +56,9 @@ test('Recurring delete can keep or remove generated history', async ({ page }) =
   // "Delete template and history" — both the template and its generated
   // entries go away; an unrelated expense is untouched.
   await page.getByRole('link', { name: 'Recurring', exact: true }).click();
-  const historyRow = page.locator('div.rounded-xl', { has: page.getByText('History Template', { exact: true }) });
-  await historyRow.locator('button').nth(2).click();
+  const deleteHistory = page.getByRole('button', { name: 'Delete "History Template"', exact: true });
+  await expect(deleteHistory).toHaveCount(1);
+  await deleteHistory.click();
   await expect(page.getByRole('heading', { name: 'Delete "History Template"?' })).toBeVisible();
   await page.getByRole('button', { name: 'Delete template and everything it generated' }).click();
   await expect(page.getByText('History Template', { exact: true })).toHaveCount(0);

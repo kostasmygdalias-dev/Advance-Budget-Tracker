@@ -29,6 +29,12 @@ const makeSeed = () => ({
 // monthly share — so a month's transaction list disagreed with the same
 // month's dashboard figure. The list now carries the installment in each
 // month the schedule covers.
+// The assertions are written for September 2026 as "this month", so the
+// clock is pinned there rather than following the real date.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 8, 20, 12));
+});
+
 test('an amortized expense appears in every month it covers, at that month\'s share', async ({ page }) => {
   await signIn(page, { seed: makeSeed() });
 

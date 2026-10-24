@@ -586,12 +586,19 @@ export const entities = { Expense, Income, Category, RecurringTemplate, Settings
 // link to find, so they're left alone regardless — there's no reliable way
 // to attribute them back to a specific template after the fact.
 export async function deleteRecurringTemplateWithHistory(template) {
-  const store = template.type === 'income' ? Income : Expense;
-  const all = await store.list();
-  const ids = all.filter((r) => r.recurring_template_id === template.id).map((r) => r.id);
-  await store.deleteMany(ids);
+  const deleted = await deleteRecurringOccurrences(template.id, template.type);
   await RecurringTemplate.delete(template.id);
-  return ids.length;
+  return deleted.length;
+}
+
+// Every entry a template generated, deleted in one batch while the template
+// itself stays. Returns the deleted rows so the caller can offer an undo.
+export async function deleteRecurringOccurrences(templateId, type) {
+  const store = type === 'income' ? Income : Expense;
+  const all = await store.list();
+  const rows = all.filter((r) => r.recurring_template_id === templateId);
+  await store.deleteMany(rows.map((r) => r.id));
+  return rows;
 }
 
 // --- Backups: point-in-time snapshots of everything, written into the same

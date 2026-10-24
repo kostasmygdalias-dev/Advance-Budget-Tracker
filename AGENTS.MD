@@ -75,6 +75,14 @@ Do not reintroduce Base44-specific patterns.
   clamped it to the 28th. The anchor is set from the date picked in the
   form, kept when a template is saved without changing its date, and
   captured on the first run for templates saved before the column existed.
+  `findMissingOccurrences()` is the reverse check: past occurrences (before
+  `next_due_date`) with no entry left, shown as a "missing" badge on the
+  Recurring page and restored via `createOccurrence()`, which never moves
+  the template's due date. An occurrence counts as present if any entry
+  lands in its period, linked by `recurring_template_id` or an unlinked one
+  with the same description and amount (typed back in by hand). Deleting a
+  template-generated row in Transactions asks "only this one / all of them"
+  (`deleteRecurringOccurrences` in `sheetsStore.js`); the template stays.
 - `src/hooks/useEntities.js`: the shared React Query cache for
   Categories/Settings (`useCategoriesQuery`/`useSettingsQuery`) — any
   component that needs categories should use this, not its own
