@@ -143,3 +143,32 @@ test('anything deleted more than a day ago is gone from Deleted for good', async
   await expect(page.getByText('Old taxi')).toHaveCount(0);
   await expect.poll(() => workbook.sheets.get('Trash').rows.map((r) => r[0]).filter((id) => id !== 'id')).toEqual(['trash-new']);
 });
+
+test('"Check all" fills every template in from the date picked, leaving deliberate deletions alone', async ({ page }) => {
+  const seed = makeSeed({ startDate: fifthOf(-1) });
+  // Loan already has -3, -2 and 0, from its own start at -1; Gym started
+  // this month and had the month two back deleted on purpose.
+  seed.RecurringTemplate.push(['tpl-gym', 'Gym', 40, 'EUR', 'monthly', '', fifthOf(1), true, CREATED, 'expense', '', '', 5, fifthOf(0), JSON.stringify([fifthOf(-2)])]);
+  seed.Expenses.push(['exp-gym0', 'Gym', 40, 'EUR', fifthOf(0), '', 'card', '', '["recurring"]', '', 'single', '', '', '[]', CREATED, false, 'tpl-gym']);
+  const workbook = await signIn(page, { seed });
+  await page.goto('/#/recurring');
+
+  await page.getByRole('button', { name: 'Check all' }).click();
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  await page.getByRole('textbox', { name: 'Day' }).click();
+  await page.keyboard.type(`01${pad2(from.getMonth() + 1)}${from.getFullYear()}`);
+  await page.getByRole('button', { name: 'Check and fill in' }).click();
+
+  await expect.poll(() => loanDates(workbook)).toEqual([-3, -2, -1, 0].map(fifthOf));
+  const gymDates = () => workbook.sheets.get('Expenses').rows.filter((r) => r[1] === 'Gym').map((r) => r[4]).sort();
+  await expect.poll(gymDates).toEqual([-3, -1, 0].map(fifthOf));
+
+  // Running it again finds nothing more to add.
+  await page.getByRole('button', { name: 'Check all' }).click();
+  await page.getByRole('textbox', { name: 'Day' }).click();
+  await page.keyboard.type(`01${pad2(from.getMonth() + 1)}${from.getFullYear()}`);
+  await page.getByRole('button', { name: 'Check and fill in' }).click();
+  await expect(page.getByText(/^Nothing missing since/)).toBeVisible();
+  expect(loanDates(workbook)).toHaveLength(4);
+});

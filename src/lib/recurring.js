@@ -88,6 +88,23 @@ async function generateOne(t, defaultCurrency) {
 // dates.
 let queue = Promise.resolve();
 
+// Widens every active template's start_date back to `fromDate`, then runs
+// the usual pass, which fills in each occurrence from there on that has no
+// entry — the "check everything since August" action on the Recurring page.
+// A start already earlier than `fromDate` is left as it is.
+export function fillAllRecurringFrom(fromDate) {
+  const widen = queue.then(async () => {
+    const templates = await entities.RecurringTemplate.list();
+    for (const t of templates) {
+      if (t.active && (!t.start_date || t.start_date > fromDate)) {
+        await entities.RecurringTemplate.update(t.id, { start_date: fromDate });
+      }
+    }
+  });
+  queue = widen.catch(() => {});
+  return widen.then(() => generateDueRecurring());
+}
+
 export function generateDueRecurring() {
   const run = queue.then(async () => {
     const [templates, settings] = await Promise.all([
