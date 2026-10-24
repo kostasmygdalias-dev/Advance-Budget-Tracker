@@ -291,6 +291,8 @@ export const el = {
     deleteTemplateOnly: 'Διαγραφή μόνο του προτύπου (διατήρηση παλαιών εγγραφών)',
     deletedWithHistoryOne: 'Το πρότυπο διαγράφηκε, μαζί με {{count}} εγγραφή που δημιούργησε',
     deletedWithHistoryOther: 'Το πρότυπο διαγράφηκε, μαζί με {{count}} εγγραφές που δημιούργησε',
+    firstEntry: 'πρώτη εγγραφή {{date}}',
+    noEntriesYet: 'καμία εγγραφή ακόμα',
     fillAll: 'Έλεγχος όλων',
     fillAllRunning: 'Έλεγχος…',
     fillAllTitle: 'Έλεγχος όλων των επαναλαμβανόμενων',

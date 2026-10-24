@@ -164,6 +164,10 @@ test('"Check all" fills every template in from the date picked, leaving delibera
   const gymDates = () => workbook.sheets.get('Expenses').rows.filter((r) => r[1] === 'Gym').map((r) => r[4]).sort();
   await expect.poll(gymDates).toEqual([-3, -1, 0].map(fifthOf));
 
+  // Each card shows how far back its entries now go.
+  const dmy = (iso) => iso.split('-').reverse().join('-');
+  await expect(page.getByText(`first entry ${dmy(fifthOf(-3))}`)).toHaveCount(2);
+
   // Running it again finds nothing more to add.
   await page.getByRole('button', { name: 'Check all' }).click();
   await page.getByRole('textbox', { name: 'Day' }).click();

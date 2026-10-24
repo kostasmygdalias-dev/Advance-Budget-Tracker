@@ -139,6 +139,9 @@ export default function Recurring() {
   const [deletingHistory, setDeletingHistory] = useState(false);
   // "Check all": the date every template is filled in from, while open.
   const [fillFrom, setFillFrom] = useState(null);
+  // Each template's oldest entry date, shown on its card so it's visible at
+  // a glance which ones go back how far.
+  const [firstEntryDate, setFirstEntryDate] = useState({});
   const [filling, setFilling] = useState(false);
 
   // One-time self-heal for templates created before RecurringTemplate had a
@@ -193,6 +196,13 @@ export default function Recurring() {
         const list = await entities.RecurringTemplate.list();
         const { templates: templatesFixed, expenses: expensesFixed } = await backfillTemplateCategories(list);
         setTemplates(generated > 0 || templatesFixed > 0 ? await entities.RecurringTemplate.list() : list);
+        const [exp, inc] = await Promise.all([entities.Expense.list(), entities.Income.list()]);
+        const firsts = {};
+        [...exp.map((e) => [e.recurring_template_id, e.paid_date]), ...inc.map((i) => [i.recurring_template_id, i.received_date])]
+          .forEach(([id, date]) => {
+            if (id && date && (!firsts[id] || date < firsts[id])) firsts[id] = date;
+          });
+        setFirstEntryDate(firsts);
         if (generated > 0) {
           toast({
             title: generated === 1 ? tr('recurring.entriesAddedOne', { count: generated }) : tr('recurring.entriesAddedOther', { count: generated }),
@@ -433,6 +443,7 @@ export default function Recurring() {
                     {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
                     {t.frequency === 'custom_days' && ` · ${tr('recurring.everyNDays', { n: t.custom_interval_days })}`}
                     {` · ${tr('recurring.next', { date: formatDateDMY(t.next_due_date) })}`}
+                    {` · ${firstEntryDate[t.id] ? tr('recurring.firstEntry', { date: formatDateDMY(firstEntryDate[t.id]) }) : tr('recurring.noEntriesYet')}`}
                   </p>
                 </div>
                 <div className="text-right">

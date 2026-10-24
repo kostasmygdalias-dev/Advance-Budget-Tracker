@@ -291,6 +291,8 @@ export const en = {
     deleteTemplateOnly: 'Delete template only (keep past entries)',
     deletedWithHistoryOne: 'Template deleted, along with {{count}} entry it generated',
     deletedWithHistoryOther: 'Template deleted, along with {{count}} entries it generated',
+    firstEntry: 'first entry {{date}}',
+    noEntriesYet: 'no entries yet',
     fillAll: 'Check all',
     fillAllRunning: 'Checking…',
     fillAllTitle: 'Check every recurring template',
