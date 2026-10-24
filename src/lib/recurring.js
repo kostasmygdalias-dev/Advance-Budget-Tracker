@@ -1,6 +1,9 @@
-import { addDays, addWeeks, subDays, subWeeks, format } from 'date-fns';
 import { entities } from '@/lib/sheetsStore';
-import { parseDateLocal } from '@/lib/finance';
+import { parseDateLocal, toDateStr, todayStr } from '@/lib/finance';
+
+// Plain calendar-day steps, so this module (loaded on every app open)
+// doesn't pull in date-fns and its formatter.
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 // The day of the month a monthly template is meant to land on. Stored
 // separately because the due date alone can't remember it: a template due
@@ -26,17 +29,17 @@ export function shiftMonths(dateStr, months, anchorDay) {
 export function advanceDate(dateStr, frequency, customDays, anchorDay) {
   const d = parseDateLocal(dateStr);
   if (frequency === 'daily') return addDays(d, 1);
-  if (frequency === 'weekly') return addWeeks(d, 1);
+  if (frequency === 'weekly') return addDays(d, 7);
   if (frequency === 'monthly') return shiftMonths(dateStr, 1, anchorDay);
   return addDays(d, customDays || 1);
 }
 
 export function regressDate(dateStr, frequency, customDays, anchorDay) {
   const d = parseDateLocal(dateStr);
-  if (frequency === 'daily') return subDays(d, 1);
-  if (frequency === 'weekly') return subWeeks(d, 1);
+  if (frequency === 'daily') return addDays(d, -1);
+  if (frequency === 'weekly') return addDays(d, -7);
   if (frequency === 'monthly') return shiftMonths(dateStr, -1, anchorDay);
-  return subDays(d, customDays || 1);
+  return addDays(d, -(customDays || 1));
 }
 
 const MAX_CATCH_UP_PER_TEMPLATE = 24;
@@ -73,7 +76,7 @@ export async function createOccurrence(t, date, defaultCurrency) {
 async function generateOne(t, defaultCurrency) {
   await createOccurrence(t, t.next_due_date, defaultCurrency);
   const anchor_day = t.frequency === 'monthly' ? anchorDayOf(t) : t.anchor_day ?? null;
-  const next_due_date = format(advanceDate(t.next_due_date, t.frequency, t.custom_interval_days, anchor_day), 'yyyy-MM-dd');
+  const next_due_date = toDateStr(advanceDate(t.next_due_date, t.frequency, t.custom_interval_days, anchor_day));
   // Writing the anchor back captures it for templates saved before the
   // column existed, while their due date still shows the intended day.
   await entities.RecurringTemplate.update(t.id, { next_due_date, anchor_day });
@@ -117,7 +120,7 @@ export function generateDueRecurring() {
       entities.Settings.list(),
     ]);
     const defaultCurrency = settings[0]?.default_currency || 'EUR';
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = todayStr();
     let generated = 0;
     for (const t of templates) {
       if (!t.active) continue;
@@ -158,7 +161,7 @@ const sameText = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().t
 export function findMissingOccurrences(t, entries, fromDate) {
   if (!t.next_due_date || !fromDate) return [];
   const anchor = t.frequency === 'monthly' ? anchorDayOf(t) : t.anchor_day;
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = todayStr();
   const covering = entries
     .filter((e) => e.recurring_template_id === t.id
       || (!e.recurring_template_id && sameText(e.description, t.description) && Number(e.amount) === Number(t.amount)))
@@ -167,7 +170,7 @@ export function findMissingOccurrences(t, entries, fromDate) {
   const missing = [];
   let periodEnd = t.next_due_date;
   for (let i = 0; i < MAX_MISSING_LOOKBACK; i++) {
-    const due = format(regressDate(periodEnd, t.frequency, t.custom_interval_days, anchor), 'yyyy-MM-dd');
+    const due = toDateStr(regressDate(periodEnd, t.frequency, t.custom_interval_days, anchor));
     if (due < fromDate) break;
     const end = periodEnd;
     // Only dates already reached: a due date edited months ahead leaves

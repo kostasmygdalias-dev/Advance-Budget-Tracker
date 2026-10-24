@@ -135,6 +135,15 @@ Do not reintroduce Base44-specific patterns.
 - `npm run dev` for local development; `npm run build` produces a static `dist/` deployable anywhere.
 - Run `npm run lint` and the Playwright suite (`npx playwright test`) before finishing code changes. `npm run typecheck` exists but has never passed — the UI is untyped `.jsx`, so it reports hundreds of pre-existing "children does not exist" errors; don't treat its output as a regression you caused, and don't set out to clear it without asking.
 - **Pushing to `master` is a live-deploy action**, not just a save point: GitHub Actions deploys the frontend on every push, and separately deploys `worker/` whenever a push touches `worker/**`. Always build + lint + run the E2E suite locally first (for `worker/**` changes, also `npx wrangler deploy --dry-run` — there's no Worker test suite), push without asking each time once that's clean, then confirm the relevant workflow(s) actually succeeded (GitHub Actions REST API) before calling something done.
+- **Reads from a sheet tab are cached for 5 seconds** (`READ_CACHE_MS` in
+  `sheetsStore.js`), shared between callers, and dropped as soon as any write
+  through that store lands. A page load used to fetch the same tab several
+  times over; don't add a separate cache on top. Anything that changes a tab
+  *outside* its store (another device, the Viber Worker, a test editing the
+  mock workbook directly) can go unseen for up to those 5 seconds.
+- The Dashboard's charts live in `src/components/DashboardCharts.jsx`,
+  lazy-loaded so the page doesn't wait on recharts (the largest chunk). Keep
+  new Dashboard charts there, not as a direct `recharts` import in the page.
 - New data collections should follow the `makeStore(...)` pattern in `sheetsStore.js` (a sheet tab per collection, in the same "ExpenseTrack Data" spreadsheet) rather than introducing a different storage mechanism.
 - **Sheet columns are read by position, not by name** — `fromRow` destructures the row array — so a column can be *appended* to a `SCHEMAS` entry (plus its `toRow`/`fromRow` pair) safely, with existing rows reading back a sensible default and no migration, but it can never be removed or reordered: dropping one shifts every column after it and silently misreads real data. When a feature is cut, delete its UI and leave its column in place, inert. `reconciled` is exactly that — gone from the app, still a column in everyone's sheet.
 - **Amortized expenses count by schedule, not by payment date.** Every total in the app (Dashboard, Reports, Budgets, Insights, the Worker's Viber reports) takes a month's share via `getMonthlyContribution`, and the Transactions month view matches: an amortized row appears in every month its schedule covers, carrying that month's installment (`_monthAmount`) in the row, the header total and the CSV. "All time" and custom ranges still list it once at its full amount — a custom range can split a month, and the schedule is month-granular. Anything new that sums expenses per month must go through `getMonthlyContribution` too, or it will disagree with everything else.

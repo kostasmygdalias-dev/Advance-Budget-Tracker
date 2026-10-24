@@ -143,11 +143,16 @@ export function currentMonthStr(ref = new Date()) {
   return toMonthStr(startOfMonth(ref));
 }
 
+// A Date as the plain "YYYY-MM-DD" string every date field stores, read in
+// local time (the inverse of parseDateLocal).
+export function toDateStr(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 // Same as currentMonthStr, but day-precision — independently redeclared in
 // ExpenseForm, IncomeForm, Goals, and Transactions.
 export function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  return toDateStr(new Date());
 }
 
 // Same one-liner was independently redeclared in every page that shows a

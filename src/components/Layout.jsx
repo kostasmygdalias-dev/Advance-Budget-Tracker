@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Lightbulb, Trash2, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
@@ -13,8 +13,10 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import CommandPalette from '@/components/CommandPalette';
 import { cn } from '@/lib/utils';
+
+// Loaded on first open — cmdk is only ever needed once someone presses Cmd+K.
+const CommandPalette = lazy(() => import('@/components/CommandPalette'));
 
 const getNav = (t) => [
   { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
@@ -104,6 +106,9 @@ export default function Layout() {
   const isPro = billingConfigured && subActive;
   const showProBadge = billingConfigured && !subActive;
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Stays mounted after the first open so closing still animates.
+  const [paletteUsed, setPaletteUsed] = useState(false);
+  useEffect(() => { if (paletteOpen) setPaletteUsed(true); }, [paletteOpen]);
   const [navOpen, setNavOpen] = useState(false);
   const { t } = useLanguage();
   const NAV = getNav(t);
@@ -275,7 +280,11 @@ export default function Layout() {
         </div>
       </main>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      {paletteUsed && (
+        <Suspense fallback={null}>
+          <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        </Suspense>
+      )}
     </div>
   );
 }

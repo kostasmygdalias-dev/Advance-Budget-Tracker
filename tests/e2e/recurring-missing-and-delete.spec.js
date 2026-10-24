@@ -161,6 +161,7 @@ test('"Check all" fills each template in from its own first entry, and no furthe
   expect(loanDates(workbook)).toEqual([-3, 0].map(fifthOf));
 
   await page.getByRole('button', { name: 'Check all' }).click();
+  await expect(page.getByText('2 recurring entries added', { exact: true })).toBeVisible();
   await expect.poll(() => loanDates(workbook)).toEqual([-3, -2, -1, 0].map(fifthOf));
   expect(gymDates()).toEqual([-1, 0].map(fifthOf));
 
@@ -171,6 +172,6 @@ test('"Check all" fills each template in from its own first entry, and no furthe
 
   // Running it again finds nothing more to add.
   await page.getByRole('button', { name: 'Check all' }).click();
-  await expect(page.getByText('Every recurring template is complete from its first entry')).toBeVisible();
+  await expect(page.getByText('Every recurring template is complete from its first entry', { exact: true })).toBeVisible();
   expect(loanDates(workbook)).toHaveLength(4);
 });

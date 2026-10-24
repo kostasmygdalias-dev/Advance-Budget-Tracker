@@ -14,10 +14,6 @@ import {
   Receipt, FolderTree, PiggyBank, Wallet, Coins, Bell,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell,
-} from 'recharts';
-import {
   getMonthlyContribution, getRecentMonths, currentMonthStr, monthLabel, monthNameLong, isInMonth, parseDateLocal, fmt, formatDateDMY,
 } from '@/lib/finance';
 import { getBiggestExpense, getTopCategory, getBurnRate, getUnusualExpense, getRecurringSplit } from '@/lib/insights';
@@ -30,6 +26,8 @@ import PageSkeleton from '@/components/PageSkeleton';
 import { useLanguage } from '@/lib/i18n';
 
 const DashboardCustomizePanel = lazy(() => import('@/components/DashboardCustomizePanel'));
+const DonutChart = lazy(() => import('@/components/DashboardCharts').then((m) => ({ default: m.DonutChart })));
+const TrendChart = lazy(() => import('@/components/DashboardCharts').then((m) => ({ default: m.TrendChart })));
 
 const INCOME_COLOR = '#10b981';
 
@@ -140,13 +138,9 @@ function MonthWidget({ label, month, income, expenses, currency }) {
         <p className="text-sm font-medium mb-3">{label}</p>
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={data} dataKey="value" innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} paddingAngle={total > 0 ? 3 : 0}>
-                  {data.map((d, i) => <Cell key={i} fill={colors[i]} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            <Suspense fallback={null}>
+              <DonutChart data={data} dataKey="value" fills={colors} innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} paddingAngle={total > 0 ? 3 : 0} />
+            </Suspense>
           </div>
           <div className="space-y-1.5">
             <p className="flex items-center gap-1.5 text-emerald-600 font-semibold tabular-nums">
@@ -704,20 +698,9 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={48} />
-                  <Tooltip
-                    formatter={(v) => fmt(v, currency)}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="income" name={t('common.income')} fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name={t('common.expense')} fill="#0f172a" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={null}>
+                <TrendChart data={trendData} tooltipFormatter={(v) => fmt(v, currency)} incomeLabel={t('common.income')} expenseLabel={t('common.expense')} />
+              </Suspense>
             </div>
           </Card>
         );
@@ -770,14 +753,9 @@ export default function Dashboard() {
             ) : (
               <div className="grid sm:grid-cols-2 gap-4 items-center">
                 <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={categoryReport} dataKey="total" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                        {categoryReport.map((d, i) => <Cell key={i} fill={d.color} />)}
-                      </Pie>
-                      <Tooltip formatter={(v) => fmt(v, currency)} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={null}>
+                    <DonutChart data={categoryReport} dataKey="total" nameKey="name" fills={categoryReport.map((d) => d.color)} innerRadius={50} outerRadius={80} paddingAngle={2} tooltipFormatter={(v) => fmt(v, currency)} />
+                  </Suspense>
                 </div>
                 <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
                   {categoryReport.map((d) => {
@@ -819,14 +797,9 @@ export default function Dashboard() {
             ) : (
               <div className="grid sm:grid-cols-2 gap-4 items-center">
                 <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={incomePieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                        {incomePieData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                      </Pie>
-                      <Tooltip formatter={(v) => fmt(v, currency)} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={null}>
+                    <DonutChart data={incomePieData} dataKey="value" nameKey="name" fills={incomePieData.map((d) => d.color)} innerRadius={50} outerRadius={80} paddingAngle={2} tooltipFormatter={(v) => fmt(v, currency)} />
+                  </Suspense>
                 </div>
                 <div className="space-y-2">
                   {incomePieData.map((d, i) => (

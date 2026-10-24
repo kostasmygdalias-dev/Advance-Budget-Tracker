@@ -3,7 +3,6 @@
 // signed-in user's own Drive on first use. No backend — reads/writes go
 // straight from the browser to the Sheets/Drive APIs using the user's own
 // OAuth token, so nobody but that user (and Google) ever sees their data.
-import { z } from 'zod';
 import { getAccessToken, refreshAccessTokenSilently } from '@/lib/googleAuth';
 
 const SPREADSHEET_TITLE = 'ExpenseTrack Data';
@@ -65,6 +64,7 @@ const SCHEMAS = {
 
 let spreadsheetIdPromise = null;
 const sheetGidCache = new Map();
+const READ_CACHE_MS = 5000;
 
 async function findSpreadsheetId() {
   const q = `name='${SPREADSHEET_TITLE}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
@@ -306,7 +306,24 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
   const headers = SCHEMAS[sheetName];
   const lastCol = COLS[headers.length - 1];
 
-  async function readRows() {
+  // Reads are shared for a few seconds: one page load asks for the same tab
+  // several times over (the recurring check, the page itself, a backfill),
+  // and every update/delete re-reads to find its row. Any write through this
+  // store drops the cache once it lands (see the end of makeStore), so it
+  // never hides this tab's own changes; the TTL bounds how long another
+  // device's edit can go unseen. Callers get their own copies, so mutating a
+  // result can't leak into the next read.
+  let cached = null;
+  function readRows() {
+    if (!cached || Date.now() - cached.at > READ_CACHE_MS) {
+      const promise = fetchRows();
+      cached = { at: Date.now(), promise };
+      promise.catch(() => { if (cached?.promise === promise) cached = null; });
+    }
+    return cached.promise.then((rows) => rows.map((r) => ({ ...r })));
+  }
+
+  async function fetchRows() {
     const spreadsheetId = await getSpreadsheetId();
     const data = await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A2:${lastCol}`);
     const rows = data.values || [];
@@ -334,7 +351,7 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
     return parsed;
   }
 
-  return {
+  const store = {
     async list(sort, limit) {
       const rows = await readRows();
       const sorted = sortBy(rows, sort);
@@ -429,11 +446,39 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
       });
     },
   };
+  for (const name of ['create', 'update', 'delete', 'deleteMany', 'restore', 'replaceAll']) {
+    const write = store[name];
+    store[name] = (...args) => write(...args).finally(() => { cached = null; });
+  }
+  return store;
 }
 
 // Shape-validates what fromRow() produces — catches wrong types slipping
 // through the naive coercion above (e.g. a formula error landing in a
 // numeric cell) without hand-writing a check for every field.
+// A stand-in for the slice of zod this file used — zod cost ~50 KB on every
+// page load for a handful of type checks. Same calls as before; safeParse
+// only reports pass/fail plus the names of the failing fields.
+const check = (test) => ({
+  test,
+  nullable: () => check((v) => v === null || test(v)),
+  min: (n) => check((v) => test(v) && v.length >= n),
+});
+const z = {
+  string: () => check((v) => typeof v === 'string'),
+  number: () => check((v) => typeof v === 'number' && !Number.isNaN(v)),
+  boolean: () => check((v) => typeof v === 'boolean'),
+  any: () => check(() => true),
+  array: (item) => check((v) => Array.isArray(v) && v.every(item.test)),
+  record: (_key, value) => check((v) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(value.test)),
+  object: (shape) => ({
+    safeParse(value) {
+      const failed = Object.keys(shape).filter((k) => !shape[k].test(value[k]));
+      return failed.length ? { success: false, error: { flatten: () => ({ fieldErrors: failed }) } } : { success: true };
+    },
+  }),
+};
+
 const RowMeta = { _row: z.number() };
 const ExpenseSchema = z.object({
   id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
