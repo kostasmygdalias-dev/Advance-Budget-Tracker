@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { entities, deleteRecurringOccurrences } from '@/lib/sheetsStore';
+import { entities, deleteEntries, deleteRecurringOccurrences, restoreFromTrash } from '@/lib/sheetsStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -444,19 +444,22 @@ export default function Transactions() {
     }
   };
 
-  // Optimistic delete with an Undo action, instead of a confirm dialog —
-  // faster for the common case, and just as safe since Undo re-creates the
-  // row (as a new record; Sheets rows have no stable way to "un-delete").
-  const undoDelete = async (row) => {
+  // Puts rows back from Trash after a delete — the Undo on the toast.
+  const undoDelete = async (items) => {
     try {
-      const created = row._type === 'expense' ? await entities.Expense.create(row) : await entities.Income.create(row);
-      if (row._type === 'expense') setExpenses((prev) => [...prev, created]);
-      else setIncomes((prev) => [...prev, created]);
+      const restored = await restoreFromTrash(items);
+      setExpenses((prev) => [...prev, ...restored.filter((r) => r._type === 'expense')]);
+      setIncomes((prev) => [...prev, ...restored.filter((r) => r._type === 'income')]);
       toast({ title: t('transactions.restoredToastTitle') });
     } catch (err) {
       toast({ title: t('transactions.couldNotRestore'), description: err.message, variant: 'destructive' });
+      load();
     }
   };
+
+  const undoAction = (items) => (
+    <ToastAction altText={t('transactions.undo')} onClick={() => undoDelete(items)}>{t('transactions.undo')}</ToastAction>
+  );
 
   // An entry a recurring template generated has siblings in other months, so
   // deleting it asks whether to take those too rather than going straight
@@ -468,21 +471,6 @@ export default function Transactions() {
     else deleteRow(row);
   };
 
-  const undoDeleteAll = async (rows, type) => {
-    try {
-      const store = type === 'expense' ? entities.Expense : entities.Income;
-      const created = [];
-      // Sequential: parallel appends to one sheet aren't guaranteed to all land.
-      for (const row of rows) created.push(await store.create(row));
-      if (type === 'expense') setExpenses((prev) => [...prev, ...created]);
-      else setIncomes((prev) => [...prev, ...created]);
-      toast({ title: t('transactions.restoredToastTitle') });
-    } catch (err) {
-      toast({ title: t('transactions.couldNotRestore'), description: err.message, variant: 'destructive' });
-      load();
-    }
-  };
-
   const deleteAllOccurrences = async (row) => {
     setRecurringDeleteRow(null);
     const templateId = row.recurring_template_id;
@@ -490,32 +478,30 @@ export default function Transactions() {
     if (row._type === 'expense') setExpenses(drop);
     else setIncomes(drop);
     try {
-      const deleted = await deleteRecurringOccurrences(templateId, row._type);
-      toast({
-        title: t('transactions.recurringDeletedAll', { count: deleted.length }),
-        action: <ToastAction altText={t('transactions.undo')} onClick={() => undoDeleteAll(deleted, row._type)}>{t('transactions.undo')}</ToastAction>,
-      });
+      const items = await deleteRecurringOccurrences(templateId, row._type);
+      toast({ title: t('transactions.recurringDeletedAll', { count: items.length }), action: undoAction(items) });
     } catch (err) {
       toast({ title: t('common.couldNotDelete'), description: err.message, variant: 'destructive' });
       load();
     }
   };
 
+  // Optimistic delete with an Undo action, instead of a confirm dialog —
+  // faster for the common case, and just as safe since the row sits in
+  // Trash for a day either way.
   const deleteRow = async (row) => {
     if (row._type === 'expense') setExpenses((prev) => prev.filter((e) => e.id !== row.id));
     else setIncomes((prev) => prev.filter((i) => i.id !== row.id));
     try {
-      if (row._type === 'expense') await entities.Expense.delete(row.id);
-      else await entities.Income.delete(row.id);
+      const items = await deleteEntries(row._type, [row]);
       toast({
         title: t('transactions.deletedToastTitle'),
         description: t('transactions.deletedToastDescription', { description: row.description }),
-        action: <ToastAction altText={t('transactions.undo')} onClick={() => undoDelete(row)}>{t('transactions.undo')}</ToastAction>,
+        action: undoAction(items),
       });
     } catch (err) {
-      if (row._type === 'expense') setExpenses((prev) => [...prev, row]);
-      else setIncomes((prev) => [...prev, row]);
       toast({ title: t('common.couldNotDelete'), description: err.message, variant: 'destructive' });
+      load();
     }
   };
 
@@ -544,10 +530,16 @@ export default function Transactions() {
     const rows = selectedRows;
     setBulkDeleteOpen(false);
     try {
-      await Promise.all(rows.map((r) => (r._type === 'expense' ? entities.Expense.delete(r.id) : entities.Income.delete(r.id))));
+      const items = [
+        ...await deleteEntries('expense', rows.filter((r) => r._type === 'expense')),
+        ...await deleteEntries('income', rows.filter((r) => r._type === 'income')),
+      ];
       setExpenses((prev) => prev.filter((e) => !selected.has(selectionKey({ ...e, _type: 'expense' }))));
       setIncomes((prev) => prev.filter((i) => !selected.has(selectionKey({ ...i, _type: 'income' }))));
-      toast({ title: rows.length === 1 ? t('transactions.bulkDeletedOne', { count: 1 }) : t('transactions.bulkDeletedOther', { count: rows.length }) });
+      toast({
+        title: rows.length === 1 ? t('transactions.bulkDeletedOne', { count: 1 }) : t('transactions.bulkDeletedOther', { count: rows.length }),
+        action: undoAction(items),
+      });
       toggleSelectMode();
     } catch (err) {
       toast({ title: t('transactions.couldNotBulkDelete'), description: err.message, variant: 'destructive' });
@@ -606,6 +598,9 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={exportCsv}>
             <Download className="w-4 h-4 mr-1" /> {t('transactions.exportCsv')}
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/trash"><Trash2 className="w-4 h-4 mr-1" /> {t('trash.title')}</Link>
           </Button>
           <Button variant={selectMode ? 'secondary' : 'outline'} onClick={toggleSelectMode}>
             {selectMode ? <X className="w-4 h-4 mr-1" /> : <ListChecks className="w-4 h-4 mr-1" />}

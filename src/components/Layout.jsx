@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Lightbulb, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
+import { LayoutDashboard, Receipt, Repeat, Target, FolderTree, PiggyBank, BarChart3, Lightbulb, Trash2, Settings as SettingsIcon, Wallet, LogOut, Crown, ChevronDown, Sun, Moon, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useRecurringCatchUp } from '@/hooks/use-recurring-catch-up';
@@ -25,6 +25,7 @@ const getNav = (t) => [
   { to: '/budgets', label: t('nav.budgets'), icon: PiggyBank },
   { to: '/reports', label: t('nav.reports'), icon: BarChart3 },
   { to: '/insights', label: t('nav.insights'), icon: Lightbulb, pro: true },
+  { to: '/trash', label: t('nav.trash'), icon: Trash2 },
   { to: '/settings', label: t('nav.settings'), icon: SettingsIcon },
 ];
 

@@ -49,7 +49,7 @@ const SCHEMAS = {
   Expenses: ['id', 'description', 'amount', 'currency', 'paid_date', 'category_id', 'payment_method', 'notes', 'tags', 'receipt_file_url', 'expense_type', 'period_value', 'period_unit', 'amortization_schedule', 'created_date', 'reconciled', 'recurring_template_id'],
   Incomes: ['id', 'description', 'amount', 'currency', 'received_date', 'source', 'notes', 'tags', 'created_date', 'reconciled', 'recurring_template_id'],
   Categories: ['id', 'name', 'icon', 'color', 'parent_id', 'sort_order', 'created_date'],
-  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source', 'category_id', 'anchor_day'],
+  RecurringTemplate: ['id', 'description', 'amount', 'currency', 'frequency', 'custom_interval_days', 'next_due_date', 'active', 'created_date', 'type', 'source', 'category_id', 'anchor_day', 'start_date', 'skipped_dates'],
   Settings: ['id', 'default_currency', 'monthly_budget_total', 'budget_per_category', 'created_date', 'budget_period', 'dashboard_layout'],
   Debts: ['id', 'person', 'direction', 'total_amount', 'paid_amount', 'currency', 'start_date', 'due_date', 'notes', 'created_date'],
   Goals: ['id', 'name', 'icon', 'target_amount', 'saved_amount', 'currency', 'deadline', 'created_date'],
@@ -57,6 +57,10 @@ const SCHEMAS = {
   // split across rows (chunk_index/chunk_total) since a single Sheets cell
   // caps out around 50,000 characters and a snapshot can exceed that.
   Backups: ['id', 'created_date', 'chunk_index', 'chunk_total', 'data'],
+  // Deleted expenses/income, restorable for a day (see deleteEntries). The
+  // whole deleted row is kept as JSON in `record`; created_date is when it
+  // was deleted.
+  Trash: ['id', 'entity', 'record', 'created_date'],
 };
 
 let spreadsheetIdPromise = null;
@@ -397,6 +401,16 @@ function makeStore(sheetName, toRow, fromRow, rowSchema) {
         }),
       });
     },
+    // Appends `record` exactly as given, keeping its id and created_date —
+    // for putting a deleted row back as the same record it was.
+    async restore(record) {
+      const spreadsheetId = await getSpreadsheetId();
+      await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A1:append?valueInputOption=RAW`, {
+        method: 'POST',
+        body: JSON.stringify({ values: [toRow(record)] }),
+      });
+      return record;
+    },
     // Wipes every existing data row and writes `records` verbatim in their
     // place — unlike create(), it does NOT mint a fresh id/created_date, so
     // cross-references between collections (category_id, parent_id,
@@ -442,7 +456,11 @@ const RecurringTemplateSchema = z.object({
   id: z.string().min(1), description: z.string(), amount: z.number(), currency: z.string(),
   frequency: z.string(), custom_interval_days: z.number().nullable(), next_due_date: z.string(),
   active: z.boolean(), created_date: z.string(), type: z.string(), source: z.string().nullable(),
-  category_id: z.string().nullable(), anchor_day: z.number().nullable(), ...RowMeta,
+  category_id: z.string().nullable(), anchor_day: z.number().nullable(),
+  start_date: z.string().nullable(), skipped_dates: z.array(z.string()), ...RowMeta,
+});
+const TrashSchema = z.object({
+  id: z.string().min(1), entity: z.string(), record: z.record(z.string(), z.any()), created_date: z.string(), ...RowMeta,
 });
 const SettingsSchema = z.object({
   id: z.string().min(1), default_currency: z.string(), monthly_budget_total: z.number().nullable(),
@@ -498,9 +516,9 @@ const RecurringTemplate = makeStore(
   (t) => [
     t.id, t.description || '', t.amount ?? 0, t.currency || 'EUR', t.frequency || 'monthly', t.custom_interval_days ?? '',
     t.next_due_date || '', t.active !== false, t.created_date || new Date().toISOString(), t.type || 'expense', t.source || '',
-    t.category_id || '', t.anchor_day ?? '',
+    t.category_id || '', t.anchor_day ?? '', t.start_date || '', JSON.stringify(t.skipped_dates || []),
   ],
-  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date, type, source, category_id, anchor_day]) => ({
+  ([id, description, amount, currency, frequency, custom_interval_days, next_due_date, active, created_date, type, source, category_id, anchor_day, start_date, skipped_dates]) => ({
     id, description: description || '', amount: Number(amount) || 0, currency: currency || 'EUR', frequency: frequency || 'monthly',
     custom_interval_days: custom_interval_days !== '' && custom_interval_days != null ? Number(custom_interval_days) : null,
     next_due_date: next_due_date || '', active: active === true || active === 'TRUE', created_date: created_date || '',
@@ -511,6 +529,11 @@ const RecurringTemplate = makeStore(
     // templates saved before this column existed — lib/recurring.js falls
     // back to the due date's own day and stores it on the next run.
     anchor_day: anchor_day !== '' && anchor_day != null ? Number(anchor_day) : null,
+    // The first occurrence the missing-entries check looks back to, and the
+    // dates of occurrences deleted on purpose, which it must not put back.
+    // See restoreMissingOccurrences() in lib/recurring.js.
+    start_date: start_date || null,
+    skipped_dates: skipped_dates ? JSON.parse(skipped_dates) : [],
   }),
   RecurringTemplateSchema,
 );
@@ -576,7 +599,83 @@ const Goal = makeStore(
   GoalSchema,
 );
 
+const Trash = makeStore(
+  'Trash',
+  (r) => [r.id, r.entity || '', JSON.stringify(r.record || {}), r.created_date || new Date().toISOString()],
+  ([id, entity, record, created_date]) => ({
+    id, entity: entity || '', record: record ? JSON.parse(record) : {}, created_date: created_date || '',
+  }),
+  TrashSchema,
+);
+
 export const entities = { Expense, Income, Category, RecurringTemplate, Settings, Debt, Goal };
+
+export const TRASH_KEEP_MS = 24 * 60 * 60 * 1000;
+const storeFor = (type) => (type === 'income' ? Income : Expense);
+const entryDate = (r) => r.paid_date || r.received_date;
+// Drops the underscore-prefixed fields the store and pages add (_row, _type,
+// _date, _monthAmount) so only the record itself is kept.
+const stripMeta = (row) => Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith('_')));
+
+// Every user-initiated delete of expenses/income goes through here rather
+// than Expense/Income.delete, so the rows land in Trash for a day first.
+// An entry a recurring template generated also gets its date recorded on
+// that template as skipped, or the app's missing-entries check would put it
+// straight back on the next open. That's written before the rows go, so a
+// check running in between can't catch the gap without the skip.
+export async function deleteEntries(type, rows, { skip = true } = {}) {
+  if (!rows.length) return [];
+  if (skip) await setSkipped(rows, true);
+  const items = [];
+  // Sequential: parallel appends to one sheet aren't guaranteed to all land.
+  for (const row of rows) items.push(await Trash.create({ entity: type, record: stripMeta(row) }));
+  await storeFor(type).deleteMany(rows.map((r) => r.id));
+  pruneTrash().catch(() => {});
+  return items;
+}
+
+async function setSkipped(rows, skipped) {
+  const byTemplate = new Map();
+  rows.filter((r) => r.recurring_template_id).forEach((r) => {
+    if (!byTemplate.has(r.recurring_template_id)) byTemplate.set(r.recurring_template_id, []);
+    byTemplate.get(r.recurring_template_id).push(entryDate(r));
+  });
+  if (!byTemplate.size) return;
+  const templates = await RecurringTemplate.list();
+  for (const [id, dates] of byTemplate) {
+    const t = templates.find((x) => x.id === id);
+    if (!t) continue;
+    const current = new Set(t.skipped_dates || []);
+    dates.forEach((d) => (skipped ? current.add(d) : current.delete(d)));
+    await RecurringTemplate.update(id, { skipped_dates: [...current].sort() });
+  }
+}
+
+async function pruneTrash() {
+  const cutoff = Date.now() - TRASH_KEEP_MS;
+  const expired = (await Trash.list()).filter((i) => new Date(i.created_date).getTime() < cutoff);
+  await Trash.deleteMany(expired.map((i) => i.id));
+}
+
+// What's still restorable, newest first. Anything past its day is removed
+// here too, so the Trash tab never grows past a day's deletions.
+export async function listTrash() {
+  await pruneTrash();
+  return Trash.list('-created_date');
+}
+
+// Puts deleted rows back as the same records (same id, so a recurring
+// entry stays linked to its template) and lifts their skip, so the
+// template treats them as present again.
+export async function restoreFromTrash(items) {
+  const restored = [];
+  for (const item of items) {
+    restored.push({ ...(await storeFor(item.entity).restore(item.record)), _type: item.entity });
+  }
+  await setSkipped(restored, false);
+  await Trash.deleteMany(items.map((i) => i.id));
+  return restored;
+}
 
 // Deleting a recurring template alone (RecurringTemplate.delete) never
 // touches the expenses/income it already generated — those are ordinary
@@ -586,19 +685,18 @@ export const entities = { Expense, Income, Category, RecurringTemplate, Settings
 // link to find, so they're left alone regardless — there's no reliable way
 // to attribute them back to a specific template after the fact.
 export async function deleteRecurringTemplateWithHistory(template) {
-  const deleted = await deleteRecurringOccurrences(template.id, template.type);
+  const rows = (await storeFor(template.type).list()).filter((r) => r.recurring_template_id === template.id);
+  // No skips to record: the template they'd go on is about to be deleted.
+  await deleteEntries(template.type, rows, { skip: false });
   await RecurringTemplate.delete(template.id);
-  return deleted.length;
+  return rows.length;
 }
 
-// Every entry a template generated, deleted in one batch while the template
-// itself stays. Returns the deleted rows so the caller can offer an undo.
+// Every entry a template generated, deleted (to Trash) while the template
+// itself stays. Returns the Trash items so the caller can offer an undo.
 export async function deleteRecurringOccurrences(templateId, type) {
-  const store = type === 'income' ? Income : Expense;
-  const all = await store.list();
-  const rows = all.filter((r) => r.recurring_template_id === templateId);
-  await store.deleteMany(rows.map((r) => r.id));
-  return rows;
+  const rows = (await storeFor(type).list()).filter((r) => r.recurring_template_id === templateId);
+  return deleteEntries(type, rows);
 }
 
 // --- Backups: point-in-time snapshots of everything, written into the same

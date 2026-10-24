@@ -6,7 +6,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Pencil, Trash2, X, Pause, ChevronDown, CalendarSearch } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Pause, ChevronDown } from 'lucide-react';
 import { addDays, addMonths, differenceInCalendarMonths, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getIncomeSources } from '@/components/IncomeForm';
@@ -26,10 +25,7 @@ import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/use-subscription';
-import {
-  advanceDate, anchorDayOf, generateDueRecurring, regressDate,
-  findMissingOccurrences, earliestOccurrence, createOccurrence,
-} from '@/lib/recurring';
+import { advanceDate, anchorDayOf, generateDueRecurring, regressDate } from '@/lib/recurring';
 import { useLanguage } from '@/lib/i18n';
 
 const getFrequencies = (t) => [
@@ -48,6 +44,17 @@ const getTypes = (t) => [
 // the 31st in every month long enough to have one. But a template due on the
 // 31st shows the 28th while it's in February, so saving it untouched (say,
 // only the amount changed) must keep the 31st, not adopt the 28th.
+// Where the app's missing-entries check starts looking back from. A new
+// template starts at its first due date; one whose schedule is changed
+// starts over from the new date, since its earlier entries were made on the
+// old schedule and wouldn't line up with the new one's periods.
+function startDateForSave(editing, original) {
+  const unchanged = original && original.next_due_date === editing.next_due_date
+    && original.frequency === editing.frequency
+    && String(original.custom_interval_days ?? '') === String(editing.custom_interval_days ?? '');
+  return unchanged ? original.start_date : editing.next_due_date;
+}
+
 function anchorForSave(editing, original) {
   if (editing.frequency !== 'monthly' || !editing.next_due_date) return null;
   if (original && original.frequency === 'monthly' && original.next_due_date === editing.next_due_date) {
@@ -130,11 +137,6 @@ export default function Recurring() {
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingHistory, setDeletingHistory] = useState(false);
-  // Every expense/income, for spotting occurrences a template has already
-  // passed but that no longer have an entry (deleted by mistake, say).
-  const [entries, setEntries] = useState([]);
-  const [missingCheck, setMissingCheck] = useState(null);
-  const [restoringMissing, setRestoringMissing] = useState(false);
 
   // One-time self-heal for templates created before RecurringTemplate had a
   // category_id column, run once per device (flag below) rather than on
@@ -188,8 +190,6 @@ export default function Recurring() {
         const list = await entities.RecurringTemplate.list();
         const { templates: templatesFixed, expenses: expensesFixed } = await backfillTemplateCategories(list);
         setTemplates(generated > 0 || templatesFixed > 0 ? await entities.RecurringTemplate.list() : list);
-        const [exp, inc] = await Promise.all([entities.Expense.list(), entities.Income.list()]);
-        setEntries([...exp, ...inc]);
         if (generated > 0) {
           toast({
             title: generated === 1 ? tr('recurring.entriesAddedOne', { count: generated }) : tr('recurring.entriesAddedOther', { count: generated }),
@@ -247,6 +247,7 @@ export default function Recurring() {
       custom_interval_days: editing.frequency === 'custom_days' ? parseInt(editing.custom_interval_days) || 1 : null,
       next_due_date: editing.next_due_date,
       anchor_day: anchorForSave(editing, templates.find((x) => x.id === editing.id)),
+      start_date: startDateForSave(editing, templates.find((x) => x.id === editing.id)),
       active: editing.active,
       source: isIncome ? (editing.source || 'other') : null,
       category_id: isIncome ? null : (editing.category_id || null),
@@ -299,68 +300,12 @@ export default function Recurring() {
     }
   };
 
-  const entriesFor = (t) => entries.filter((e) => (t.type === 'income' ? e.received_date : e.paid_date));
-  const defaultMissing = (t) => {
-    const own = entriesFor(t);
-    return findMissingOccurrences(t, own, earliestOccurrence(t, own));
-  };
-
-  const openMissingCheck = (t) => {
-    const own = entriesFor(t);
-    // With nothing left to date the template from, start a year back so the
-    // check still has something to look through.
-    const from = earliestOccurrence(t, own) || format(addMonths(new Date(), -12), 'yyyy-MM-dd');
-    const missing = findMissingOccurrences(t, own, from);
-    setMissingCheck({ template: t, from, missing, selected: new Set(missing) });
-  };
-
-  const changeMissingFrom = (from) => {
-    setMissingCheck((m) => {
-      const missing = from ? findMissingOccurrences(m.template, entriesFor(m.template), from) : [];
-      return { ...m, from, missing, selected: new Set(missing) };
-    });
-  };
-
-  const toggleMissing = (date) => {
-    setMissingCheck((m) => {
-      const selected = new Set(m.selected);
-      if (selected.has(date)) selected.delete(date);
-      else selected.add(date);
-      return { ...m, selected };
-    });
-  };
-
-  const restoreMissing = async () => {
-    const { template, missing, selected } = missingCheck;
-    const dates = missing.filter((d) => selected.has(d));
-    setRestoringMissing(true);
-    try {
-      // One at a time: each create appends a row, and parallel appends to
-      // the same sheet aren't guaranteed to all land.
-      for (const date of dates) await createOccurrence(template, date, defaultCurrency);
-      toast({
-        title: dates.length === 1
-          ? tr('recurring.missingRestoredOne', { count: dates.length })
-          : tr('recurring.missingRestoredOther', { count: dates.length }),
-      });
-      setMissingCheck(null);
-      load();
-    } catch (err) {
-      toast({ title: tr('common.couldNotSave'), description: err.message, variant: 'destructive' });
-      load();
-    } finally {
-      setRestoringMissing(false);
-    }
-  };
-
   if (loading || subLoading || catQuery.isLoading) return <PageSkeleton />;
   if (loadError || catQuery.error) return <LoadError error={loadError || catQuery.error} onRetry={() => { load(); catQuery.refetch(); }} />;
   if (billingConfigured && !subActive) return <UpgradePrompt upgradeUrl={upgradeUrl} />;
 
   const forecast = forecastRecurring(templates, defaultCurrency, lang);
   const hasActive = templates.some((t) => t.active);
-  const missingByTemplate = Object.fromEntries(templates.map((t) => [t.id, defaultMissing(t)]));
-  const totalMissing = Object.values(missingByTemplate).reduce((n, m) => n + m.length, 0);
 
   return (
     <div className="space-y-6">
@@ -382,15 +327,6 @@ export default function Recurring() {
 
       {templates.length === 0 && (
         <p className="text-sm text-muted-foreground">{tr('recurring.noneYet')}</p>
-      )}
-
-      {totalMissing > 0 && (
-        <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
-          <p className="text-sm font-medium">
-            {totalMissing === 1 ? tr('recurring.missingBannerOne', { count: totalMissing }) : tr('recurring.missingBannerOther', { count: totalMissing })}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{tr('recurring.missingBannerBody')}</p>
-        </Card>
       )}
 
       {hasActive && (
@@ -458,17 +394,6 @@ export default function Recurring() {
                       </span>
                     )}
                     {!t.active && <span className="text-xs text-muted-foreground">{tr('recurring.paused')}</span>}
-                    {missingByTemplate[t.id].length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => openMissingCheck(t)}
-                        className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 hover:bg-amber-200"
-                      >
-                        {missingByTemplate[t.id].length === 1
-                          ? tr('recurring.missingBadgeOne', { count: 1 })
-                          : tr('recurring.missingBadgeOther', { count: missingByTemplate[t.id].length })}
-                      </button>
-                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {FREQUENCIES.find((f) => f.value === t.frequency)?.label}
@@ -489,9 +414,6 @@ export default function Recurring() {
                   aria-label={t.active ? tr('recurring.pauseTemplateButton', { description: t.description }) : tr('recurring.resumeTemplateButton', { description: t.description })}
                 >
                   <Pause className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => openMissingCheck(t)} aria-label={tr('recurring.checkMissingButton', { description: t.description })}>
-                  <CalendarSearch className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(t)} aria-label={tr('recurring.editTemplateButton', { description: t.description })}>
                   <Pencil className="w-4 h-4" />
@@ -621,40 +543,6 @@ export default function Recurring() {
               </div>
               <Button type="submit" className="w-full">{tr('common.save')}</Button>
             </form>
-          </Card>
-        </div>
-      )}
-
-      {missingCheck && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setMissingCheck(null)}>
-          <Card className="p-5 w-full max-w-md space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="font-heading font-semibold">{tr('recurring.missingTitle', { description: missingCheck.template.description })}</h2>
-                <p className="text-xs text-muted-foreground mt-1">{tr('recurring.missingBody')}</p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setMissingCheck(null)} aria-label={tr('common.close')}><X className="w-4 h-4" /></Button>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="r-missing-from">{tr('recurring.missingFrom')}</Label>
-              <DateInput id="r-missing-from" value={missingCheck.from} onChange={changeMissingFrom} />
-            </div>
-            {missingCheck.missing.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{tr('recurring.missingNone', { date: formatDateDMY(missingCheck.from) })}</p>
-            ) : (
-              <div className="space-y-1">
-                {missingCheck.missing.map((date) => (
-                  <label key={date} className="flex items-center gap-3 py-1.5 text-sm cursor-pointer">
-                    <Checkbox checked={missingCheck.selected.has(date)} onCheckedChange={() => toggleMissing(date)} aria-label={formatDateDMY(date)} />
-                    <span className="tabular-nums flex-1">{formatDateDMY(date)}</span>
-                    <span className="tabular-nums text-muted-foreground">{fmt(missingCheck.template.amount, missingCheck.template.currency)}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <Button className="w-full" onClick={restoreMissing} disabled={restoringMissing || missingCheck.selected.size === 0}>
-              {tr('recurring.missingRestoreButton', { count: missingCheck.selected.size })}
-            </Button>
           </Card>
         </div>
       )}

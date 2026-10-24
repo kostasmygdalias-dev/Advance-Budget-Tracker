@@ -9,17 +9,18 @@ const fifthOf = (offset) => {
   const d = new Date(now.getFullYear(), now.getMonth() + offset, 5);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-05`;
 };
-const dmy = (iso) => iso.split('-').reverse().join('-');
-const loanEntry = (id, date) => ['' + id, 'Loan', 300, 'EUR', date, '', 'card', '', '["recurring"]', '', 'single', '', '', '[]', CREATED, false, 'tpl-loan'];
+const loanEntry = (id, date) => [id, 'Loan', 300, 'EUR', date, '', 'card', '', '["recurring"]', '', 'single', '', '', '[]', CREATED, false, 'tpl-loan'];
+const TEMPLATE_COLS = { next_due_date: 6, start_date: 13, skipped_dates: 14 };
 
 // A monthly loan on the 5th, already run up to this month (next due is next
-// month), with last month's entry deleted. The mock's Expenses header lags a
-// column, so recurring_template_id is appended to it by hand.
+// month), with last month's entry gone. The mock's headers lag the real
+// schema, so trailing fields (recurring_template_id, start_date,
+// skipped_dates) are appended positionally.
 // Built per test, since the mock mutates the seed's own arrays.
-const makeSeed = () => ({
+const makeSeed = ({ startDate = '', skipped = [] } = {}) => ({
   RecurringTemplate: [
     SHEET_HEADERS.RecurringTemplate,
-    ['tpl-loan', 'Loan', 300, 'EUR', 'monthly', '', fifthOf(1), true, CREATED, 'expense', '', '', 5],
+    ['tpl-loan', 'Loan', 300, 'EUR', 'monthly', '', fifthOf(1), true, CREATED, 'expense', '', '', 5, startDate, JSON.stringify(skipped)],
   ],
   Expenses: [
     [...SHEET_HEADERS.Expenses, 'recurring_template_id'],
@@ -35,68 +36,72 @@ const loanDates = (workbook) => workbook.sheets.get('Expenses').rows
   .filter((r) => r[1] === 'Loan')
   .map((r) => r[4])
   .sort();
+const template = (workbook) => workbook.sheets.get('RecurringTemplate').rows.find((r) => r[0] === 'tpl-loan');
 
-test('the Recurring page flags a deleted past occurrence and puts it back on its own date', async ({ page }) => {
+test('opening the app puts back a recurring entry that went missing, on its own date', async ({ page }) => {
   const workbook = await signIn(page, { seed: makeSeed() });
-  await page.goto('/#/recurring');
-
-  await expect(page.getByText('1 recurring entry is missing from a month it was due in')).toBeVisible();
-  await page.getByRole('button', { name: '1 missing' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Missing entries — "Loan"' })).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: dmy(fifthOf(-1)) })).toBeChecked();
-  await page.getByRole('button', { name: 'Restore selected (1)' }).click();
 
   await expect.poll(() => loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2), fifthOf(-1), fifthOf(0)]);
   const restored = workbook.sheets.get('Expenses').rows.find((r) => r[1] === 'Loan' && r[4] === fifthOf(-1));
   expect(restored[16]).toBe('tpl-loan');
-  // Restoring a past occurrence leaves the template's schedule alone.
-  const template = workbook.sheets.get('RecurringTemplate').rows.find((r) => r[0] === 'tpl-loan');
-  expect(template[6]).toBe(fifthOf(1));
-  await expect(page.getByText(/recurring entr(y is|ies are) missing/)).toHaveCount(0);
+  // The schedule is untouched, and the oldest entry is kept as the start so
+  // the check still reaches back there if that entry goes later.
+  expect(template(workbook)[TEMPLATE_COLS.next_due_date]).toBe(fifthOf(1));
+  expect(template(workbook)[TEMPLATE_COLS.start_date]).toBe(fifthOf(-3));
 });
 
-test('an earlier start date finds occurrences deleted before the oldest one left', async ({ page }) => {
-  const workbook = await signIn(page, { seed: makeSeed() });
-  await page.goto('/#/recurring');
-  await page.getByRole('button', { name: 'Check "Loan" for missing entries' }).click();
-
-  const from = fifthOf(-5);
-  await page.getByRole('textbox', { name: 'Day' }).click();
-  await page.keyboard.type(dmy(from).replaceAll('-', ''));
-
-  for (const offset of [-5, -4, -1]) {
-    await expect(page.getByRole('checkbox', { name: dmy(fifthOf(offset)) })).toBeChecked();
-  }
-  // Leave one out: only the ticked ones come back.
-  await page.getByRole('checkbox', { name: dmy(fifthOf(-4)) }).click();
-  await page.getByRole('button', { name: 'Restore selected (2)' }).click();
-
-  await expect.poll(() => loanDates(workbook)).toEqual([fifthOf(-5), fifthOf(-3), fifthOf(-2), fifthOf(-1), fifthOf(0)]);
+test('the check reaches back to the template\'s start date, before its oldest entry left', async ({ page }) => {
+  const workbook = await signIn(page, { seed: makeSeed({ startDate: fifthOf(-5) }) });
+  await expect.poll(() => loanDates(workbook)).toEqual([-5, -4, -3, -2, -1, 0].map(fifthOf));
 });
 
-test('an entry typed back in by hand after a deletion counts as present, not missing', async ({ page }) => {
+test('an occurrence deleted on purpose stays deleted', async ({ page }) => {
+  const workbook = await signIn(page, { seed: makeSeed({ skipped: [fifthOf(-1)] }) });
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2), fifthOf(0)]);
+});
+
+test('an entry typed back in by hand counts as present, so it isn\'t doubled', async ({ page }) => {
   const seed = makeSeed();
   seed.Expenses.push(['exp-manual', 'loan ', 300, 'EUR', fifthOf(-1), '', 'card', '', '[]', '', 'single', '', '', '[]', CREATED, false, '']);
-  await signIn(page, { seed });
-  await page.goto('/#/recurring');
-  await expect(page.getByText('Loan', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: /missing$/ })).toHaveCount(0);
+  const workbook = await signIn(page, { seed });
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2), fifthOf(0)]);
 });
 
-test('deleting a recurring entry asks first, and "only this one" leaves the other months alone', async ({ page }) => {
-  const workbook = await signIn(page, { seed: makeSeed() });
+test('deleting one recurring entry asks first, isn\'t put back, and can be restored from Deleted', async ({ page }) => {
+  const workbook = await signIn(page, { seed: makeSeed({ skipped: [fifthOf(-1)] }) });
   await page.goto('/#/transactions');
   await page.getByRole('button', { name: 'Delete "Loan"' }).first().click();
 
   await expect(page.getByRole('alertdialog')).toContainText('has 3 entries across your months');
   await page.getByRole('button', { name: 'Delete only this one' }).click();
-
   await expect.poll(() => loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2)]);
+  expect(JSON.parse(template(workbook)[TEMPLATE_COLS.skipped_dates])).toEqual([fifthOf(-1), fifthOf(0)]);
+
+  // A fresh open doesn't bring it back.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2)]);
+
+  await page.getByRole('link', { name: 'Deleted' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Deleted' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore "Loan"' }).click();
+  await expect(page.getByText('Nothing deleted in the last 24 hours.')).toBeVisible();
+
+  await expect.poll(() => loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2), fifthOf(0)]);
+  // Back as the same record, still linked, and no longer skipped.
+  const back = workbook.sheets.get('Expenses').rows.find((r) => r[4] === fifthOf(0) && r[1] === 'Loan');
+  expect(back[0]).toBe('exp-m0');
+  expect(back[16]).toBe('tpl-loan');
+  expect(JSON.parse(template(workbook)[TEMPLATE_COLS.skipped_dates])).toEqual([fifthOf(-1)]);
 });
 
 test('deleting a recurring entry can take every month with it, and Undo brings them all back', async ({ page }) => {
-  const workbook = await signIn(page, { seed: makeSeed() });
+  const workbook = await signIn(page, { seed: makeSeed({ skipped: [fifthOf(-1)] }) });
   await page.goto('/#/transactions');
   await page.getByRole('button', { name: 'Delete "Loan"' }).first().click();
   await page.getByRole('button', { name: 'Delete all 3 entries' }).click();
@@ -104,16 +109,37 @@ test('deleting a recurring entry can take every month with it, and Undo brings t
   await expect.poll(() => loanDates(workbook)).toEqual([]);
   // Unrelated entries and the template itself stay.
   expect(workbook.sheets.get('Expenses').rows.some((r) => r[1] === 'Coffee')).toBe(true);
-  expect(workbook.sheets.get('RecurringTemplate').rows.some((r) => r[0] === 'tpl-loan')).toBe(true);
+  expect(template(workbook)).toBeTruthy();
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect.poll(() => loanDates(workbook)).toEqual([fifthOf(-3), fifthOf(-2), fifthOf(0)]);
 });
 
-test('a one-off expense still deletes straight away with no question', async ({ page }) => {
-  const workbook = await signIn(page, { seed: makeSeed() });
+test('a one-off expense deletes straight away and waits in Deleted', async ({ page }) => {
+  const workbook = await signIn(page, { seed: makeSeed({ skipped: [fifthOf(-1)] }) });
   await page.goto('/#/transactions');
   await page.getByRole('button', { name: 'Delete "Coffee"' }).first().click();
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect.poll(() => workbook.sheets.get('Expenses').rows.some((r) => r[1] === 'Coffee')).toBe(false);
+
+  await page.goto('/#/trash');
+  await expect(page.getByText('Coffee', { exact: true })).toBeVisible();
+  await expect(page.getByText(/2[34] hours left/)).toBeVisible();
+});
+
+test('anything deleted more than a day ago is gone from Deleted for good', async ({ page }) => {
+  const seed = makeSeed({ skipped: [fifthOf(-1)] });
+  const old = new Date(Date.now() - 25 * 3600000).toISOString();
+  const recent = new Date(Date.now() - 2 * 3600000).toISOString();
+  seed.Trash = [
+    ['id', 'entity', 'record', 'created_date'],
+    ['trash-old', 'expense', JSON.stringify({ id: 'e-old', description: 'Old taxi', amount: 12, currency: 'EUR', paid_date: fifthOf(-1) }), old],
+    ['trash-new', 'income', JSON.stringify({ id: 'i-new', description: 'Refund', amount: 30, currency: 'EUR', received_date: fifthOf(0) }), recent],
+  ];
+  const workbook = await signIn(page, { seed });
+  await page.goto('/#/trash');
+
+  await expect(page.getByText('Refund', { exact: true })).toBeVisible();
+  await expect(page.getByText('Old taxi')).toHaveCount(0);
+  await expect.poll(() => workbook.sheets.get('Trash').rows.map((r) => r[0]).filter((id) => id !== 'id')).toEqual(['trash-new']);
 });

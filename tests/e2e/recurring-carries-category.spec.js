@@ -58,7 +58,10 @@ const pastExpenseSeed = {
     SHEET_HEADERS.RecurringTemplate,
     // Far-future next_due_date — catchUp() generates nothing this run, so
     // the only thing under test is the retroactive fix on the old row below.
-    [NETFLIX_TEMPLATE_ID, 'Netflix', 15.99, 'EUR', 'monthly', '', '2027-01-01', true, CREATED, 'expense', '', ENTERTAINMENT_ID],
+    // start_date (after an empty anchor_day) at the next due date too, so
+    // the app's missing-entries check doesn't fill the months between the
+    // old row below and it.
+    [NETFLIX_TEMPLATE_ID, 'Netflix', 15.99, 'EUR', 'monthly', '', '2027-01-01', true, CREATED, 'expense', '', ENTERTAINMENT_ID, '', '2027-01-01'],
   ],
   Expenses: [
     [...SHEET_HEADERS.Expenses, 'recurring_template_id'],

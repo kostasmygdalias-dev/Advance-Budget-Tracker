@@ -111,6 +111,9 @@ export function generateDueRecurring() {
         iterations++;
       }
     }
+    // Re-read: the loop above has moved due dates on.
+    const current = generated > 0 ? await entities.RecurringTemplate.list() : templates;
+    generated += await restoreMissingOccurrences(current, defaultCurrency);
     return generated;
   });
   // A failed run mustn't wedge every later one behind it.
@@ -119,37 +122,64 @@ export function generateDueRecurring() {
 }
 
 const MAX_MISSING_LOOKBACK = 400;
+const MAX_RESTORE_PER_TEMPLATE = 24;
 const entryDate = (e) => e.paid_date || e.received_date;
 const sameText = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
 
 // The occurrences a template has already passed (everything before its
-// next_due_date, back to `fromDate`) that have no entry left. An occurrence
+// next_due_date and up to today, back to `fromDate`) that have no entry left. An occurrence
 // counts as covered by any entry in its own period, not just on its exact
-// day, so one whose date was edited by hand isn't reported; and by an
-// unlinked entry with the same description and amount, so one re-typed by
-// hand after a deletion isn't restored a second time.
+// day, so one whose date was edited by hand isn't reported; by an unlinked
+// entry with the same description and amount, so one re-typed by hand after
+// a deletion isn't restored a second time; and by a date in skipped_dates,
+// which is an occurrence deleted on purpose.
 export function findMissingOccurrences(t, entries, fromDate) {
   if (!t.next_due_date || !fromDate) return [];
   const anchor = t.frequency === 'monthly' ? anchorDayOf(t) : t.anchor_day;
-  const own = entries.filter((e) => e.recurring_template_id === t.id
-    || (!e.recurring_template_id && sameText(e.description, t.description) && Number(e.amount) === Number(t.amount)));
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const covering = entries
+    .filter((e) => e.recurring_template_id === t.id
+      || (!e.recurring_template_id && sameText(e.description, t.description) && Number(e.amount) === Number(t.amount)))
+    .map(entryDate)
+    .concat(t.skipped_dates || []);
   const missing = [];
   let periodEnd = t.next_due_date;
   for (let i = 0; i < MAX_MISSING_LOOKBACK; i++) {
     const due = format(regressDate(periodEnd, t.frequency, t.custom_interval_days, anchor), 'yyyy-MM-dd');
     if (due < fromDate) break;
     const end = periodEnd;
-    if (!own.some((e) => entryDate(e) >= due && entryDate(e) < end)) missing.push(due);
+    // Only dates already reached: a due date edited months ahead leaves
+    // periods before it that simply haven't happened yet.
+    if (due <= today && !covering.some((d) => d >= due && d < end)) missing.push(due);
     periodEnd = due;
   }
   return missing.reverse();
 }
 
-// Where the missing-entries check starts by default: the template's oldest
-// entry still around. Gaps after it are certain; anything before it can't
-// be told apart from the template simply not having existed yet, which is
-// why the check also lets an earlier start be picked by hand.
-export function earliestOccurrence(t, entries) {
-  const dates = entries.filter((e) => e.recurring_template_id === t.id).map(entryDate).filter(Boolean).sort();
-  return dates[0] || null;
+// Puts back any occurrence a template has passed that no longer has an entry
+// — deleted by mistake in the app, or straight from the Sheet. Looks back to
+// the template's start_date; a template saved before that column existed
+// adopts its oldest remaining entry as the start, which is then stored so
+// the window doesn't shrink if that entry is deleted later. Deleting through
+// the app records the date as skipped (deleteEntries), so a deliberate
+// deletion stays deleted.
+async function restoreMissingOccurrences(templates, defaultCurrency) {
+  const [expenses, incomes] = await Promise.all([entities.Expense.list(), entities.Income.list()]);
+  let restored = 0;
+  for (const t of templates) {
+    if (!t.active) continue;
+    const entries = t.type === 'income' ? incomes : expenses;
+    let from = t.start_date;
+    if (!from) {
+      from = entries.filter((e) => e.recurring_template_id === t.id).map(entryDate).filter(Boolean).sort()[0];
+      if (!from) continue;
+      await entities.RecurringTemplate.update(t.id, { start_date: from });
+    }
+    const missing = findMissingOccurrences(t, entries, from).slice(-MAX_RESTORE_PER_TEMPLATE);
+    for (const date of missing) {
+      await createOccurrence(t, date, defaultCurrency);
+      restored++;
+    }
+  }
+  return restored;
 }

@@ -75,14 +75,22 @@ Do not reintroduce Base44-specific patterns.
   clamped it to the 28th. The anchor is set from the date picked in the
   form, kept when a template is saved without changing its date, and
   captured on the first run for templates saved before the column existed.
-  `findMissingOccurrences()` is the reverse check: past occurrences (before
-  `next_due_date`) with no entry left, shown as a "missing" badge on the
-  Recurring page and restored via `createOccurrence()`, which never moves
-  the template's due date. An occurrence counts as present if any entry
-  lands in its period, linked by `recurring_template_id` or an unlinked one
-  with the same description and amount (typed back in by hand). Deleting a
-  template-generated row in Transactions asks "only this one / all of them"
-  (`deleteRecurringOccurrences` in `sheetsStore.js`); the template stays.
+  Each run also puts back past occurrences that have no entry left
+  (`restoreMissingOccurrences`), looking back to the template's
+  `start_date` (set on save, reset when its schedule changes; legacy
+  templates adopt their oldest linked entry). An occurrence counts as present
+  if an entry lands in its period — linked by `recurring_template_id`, or
+  unlinked with the same description and amount — or if its date is in the
+  template's `skipped_dates`.
+- **Deleting expenses/income goes through `deleteEntries()`** in
+  `sheetsStore.js`, never `Expense/Income.delete` directly. It moves the
+  rows to the `Trash` tab (restorable for 24 hours from the Deleted page,
+  pruned after that) and records a template-generated row's date in its
+  template's `skipped_dates` — without that, the restore above would put a
+  deliberate deletion straight back on the next open. `restoreFromTrash()`
+  puts the same record back and lifts the skip. The Viber bot's delete
+  (`worker/`) still deletes the row outright, so a recurring entry deleted
+  there gets restored.
 - `src/hooks/useEntities.js`: the shared React Query cache for
   Categories/Settings (`useCategoriesQuery`/`useSettingsQuery`) — any
   component that needs categories should use this, not its own
