@@ -25,7 +25,7 @@ import LoadError from '@/components/LoadError';
 import PageSkeleton from '@/components/PageSkeleton';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/use-subscription';
-import { advanceDate, anchorDayOf, generateDueRecurring, fillAllRecurringFrom, regressDate } from '@/lib/recurring';
+import { advanceDate, anchorDayOf, generateDueRecurring, checkAllRecurring, regressDate } from '@/lib/recurring';
 import { useLanguage } from '@/lib/i18n';
 
 const getFrequencies = (t) => [
@@ -137,8 +137,6 @@ export default function Recurring() {
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingHistory, setDeletingHistory] = useState(false);
-  // "Check all": the date every template is filled in from, while open.
-  const [fillFrom, setFillFrom] = useState(null);
   // Each template's oldest entry date, shown on its card so it's visible at
   // a glance which ones go back how far.
   const [firstEntryDate, setFirstEntryDate] = useState({});
@@ -282,20 +280,13 @@ export default function Recurring() {
     }
   };
 
-  const openFillAll = () => {
-    const d = new Date();
-    setFillFrom(format(new Date(d.getFullYear(), d.getMonth() - 2, 1), 'yyyy-MM-dd'));
-  };
-
   const fillAll = async () => {
-    const from = fillFrom;
-    setFillFrom(null);
     setFilling(true);
     try {
-      const added = await fillAllRecurringFrom(from);
+      const added = await checkAllRecurring();
       toast({
         title: added === 0
-          ? tr('recurring.fillAllComplete', { date: formatDateDMY(from) })
+          ? tr('recurring.fillAllComplete')
           : added === 1 ? tr('recurring.entriesAddedOne', { count: added }) : tr('recurring.entriesAddedOther', { count: added }),
       });
       load();
@@ -353,7 +344,7 @@ export default function Recurring() {
         </div>
         <div className="flex items-center gap-2">
         {templates.length > 0 && (
-          <Button variant="outline" onClick={openFillAll} disabled={filling}>
+          <Button variant="outline" onClick={fillAll} disabled={filling}>
             <ListChecks className="w-4 h-4 mr-1" /> {filling ? tr('recurring.fillAllRunning') : tr('recurring.fillAll')}
           </Button>
         )}
@@ -591,30 +582,6 @@ export default function Recurring() {
           </Card>
         </div>
       )}
-
-      <AlertDialog open={!!fillFrom} onOpenChange={(open) => { if (!open) setFillFrom(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{tr('recurring.fillAllTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{tr('recurring.fillAllBody')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="r-fill-from">{tr('recurring.fillAllFrom')}</Label>
-            <DateInput id="r-fill-from" value={fillFrom || ''} onChange={(v) => setFillFrom(v)} />
-          </div>
-          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
-            <button
-              type="button"
-              onClick={fillAll}
-              disabled={!fillFrom}
-              className={buttonVariants({ className: 'w-full' })}
-            >
-              {tr('recurring.fillAllConfirm')}
-            </button>
-            <AlertDialogCancel className="w-full mt-0">{tr('common.cancel')}</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>

@@ -88,16 +88,21 @@ async function generateOne(t, defaultCurrency) {
 // dates.
 let queue = Promise.resolve();
 
-// Widens every active template's start_date back to `fromDate`, then runs
-// the usual pass, which fills in each occurrence from there on that has no
-// entry — the "check everything since August" action on the Recurring page.
-// A start already earlier than `fromDate` is left as it is.
-export function fillAllRecurringFrom(fromDate) {
+// The "Check all" action on the Recurring page: moves every active
+// template's start_date back to its own oldest entry, then runs the usual
+// pass, which fills in each period from there up to today that has no
+// entry. A start already earlier than that entry is kept.
+export function checkAllRecurring() {
   const widen = queue.then(async () => {
-    const templates = await entities.RecurringTemplate.list();
+    const [templates, expenses, incomes] = await Promise.all([
+      entities.RecurringTemplate.list(), entities.Expense.list(), entities.Income.list(),
+    ]);
     for (const t of templates) {
-      if (t.active && (!t.start_date || t.start_date > fromDate)) {
-        await entities.RecurringTemplate.update(t.id, { start_date: fromDate });
+      if (!t.active) continue;
+      const first = (t.type === 'income' ? incomes : expenses)
+        .filter((e) => e.recurring_template_id === t.id).map(entryDate).filter(Boolean).sort()[0];
+      if (first && (!t.start_date || t.start_date > first)) {
+        await entities.RecurringTemplate.update(t.id, { start_date: first });
       }
     }
   });
